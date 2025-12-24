@@ -11,8 +11,29 @@ import { Target, PiggyBank, CheckCircle2, CalendarDays } from "lucide-react";
 import { GoalsProvider } from "@/contexts/goals-context";
 import { GoalsPageClient } from "@/components/goals/goals-page-client";
 import { GoalsEditDialog } from "@/components/goals/goals-edit-dialog";
+import { TablePagination } from "@/components/shared/table-pagination";
+import { TableFilters } from "@/components/shared/table-filters";
+import { ItemsPerPageSelector } from "@/components/shared/items-per-page-selector";
+import { applySort, applySearchFilter } from "@/lib/table-utils";
+import { DEFAULT_ITEMS_PER_PAGE } from "@/constants/ui";
 
-export default async function GoalsPage() {
+export default async function GoalsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    page?: string;
+    perPage?: string;
+    sort?: string;
+    order?: "asc" | "desc";
+    search?: string;
+    status?: string;
+  }>;
+}) {
+  const params = await searchParams;
+  const itemsPerPage = Math.max(2, Math.min(100, parseInt(params.perPage || DEFAULT_ITEMS_PER_PAGE.toString(), 10)));
+  const currentPage = Math.max(1, parseInt(params.page || "1", 10));
+  const offset = (currentPage - 1) * itemsPerPage;
+  
   const supabase = await createClient();
   const {
     data: { user },
@@ -22,30 +43,84 @@ export default async function GoalsPage() {
     redirect("/login");
   }
 
-  const { data: goals, error } = await supabase
+  // Buscar todas as metas para aplicar filtros, ordenação e paginação
+  const { data: allGoalsForFilter, error } = await supabase
     .from("goals")
     .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+    .eq("user_id", user.id);
 
   if (error) {
     console.error("Erro ao buscar metas:", error);
   }
 
-  const goalsData = goals || [];
+  let filteredGoals = allGoalsForFilter || [];
 
-  const totalGoals = goalsData.length;
-  const totalCurrent = goalsData.reduce(
+  // Aplicar busca em todas as metas
+  if (params.search) {
+    filteredGoals = filteredGoals.filter((g) =>
+      g.name.toLowerCase().includes(params.search!.toLowerCase())
+    );
+  }
+
+  // Aplicar filtro de status
+  if (params.status) {
+    if (params.status === "completed") {
+      filteredGoals = filteredGoals.filter(
+        (g) => (g.current_amount ?? 0) >= (g.target_amount || 0) && g.target_amount > 0
+      );
+    } else if (params.status === "active") {
+      filteredGoals = filteredGoals.filter(
+        (g) => (g.current_amount ?? 0) < (g.target_amount || 0)
+      );
+    }
+  }
+
+  // Aplicar ordenação
+  const sortColumn = params.sort || "created_at";
+  const sortOrder = params.order || "desc";
+  filteredGoals.sort((a, b) => {
+    let aVal: any = a[sortColumn as keyof typeof a];
+    let bVal: any = b[sortColumn as keyof typeof b];
+    
+    if (aVal === null || aVal === undefined) aVal = "";
+    if (bVal === null || bVal === undefined) bVal = "";
+    
+    if (typeof aVal === "string") {
+      aVal = aVal.toLowerCase();
+      bVal = bVal.toLowerCase();
+    }
+    
+    if (sortOrder === "asc") {
+      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+    } else {
+      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+    }
+  });
+
+  // Aplicar paginação
+  const totalGoals = filteredGoals.length;
+  const totalPages = Math.ceil(totalGoals / itemsPerPage);
+  const goalsData = filteredGoals.slice(offset, offset + itemsPerPage);
+
+  // Buscar TODAS as metas para calcular estatísticas (sem paginação)
+  const { data: allGoals } = await supabase
+    .from("goals")
+    .select("*")
+    .eq("user_id", user.id);
+
+  const allGoalsData = allGoals || [];
+  const totalGoalsCount = allGoalsData.length;
+  const totalCurrent = allGoalsData.reduce(
     (sum, goal) => sum + (goal.current_amount || 0),
     0
   );
-  const activeGoals = goalsData.filter(
+  const activeGoals = allGoalsData.filter(
     (g) => (g.current_amount ?? 0) < (g.target_amount || 0)
   ).length;
-  const completedGoals = goalsData.filter(
+  const completedGoals = allGoalsData.filter(
     (g) => (g.current_amount ?? 0) >= (g.target_amount || 0) && g.target_amount > 0
   ).length;
-  const totalTarget = goalsData.reduce(
+  const totalTarget = allGoalsData.reduce(
     (sum, goal) => sum + (goal.target_amount || 0),
     0
   );
@@ -76,7 +151,7 @@ export default async function GoalsPage() {
             <CardContent>
               <div className="text-2xl font-bold">{activeGoals}</div>
               <p className="text-xs text-muted-foreground">
-                de {totalGoals} no total
+                de {totalGoalsCount} no total
               </p>
             </CardContent>
           </Card>
@@ -139,8 +214,42 @@ export default async function GoalsPage() {
               Todas as suas metas financeiras e seus respectivos progressos.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <TableFilters
+              searchPlaceholder="Buscar por nome..."
+              searchKey="search"
+              selectFilters={[
+                {
+                  key: "status",
+                  label: "Status",
+                  placeholder: "Todos os status",
+                  options: [
+                    { value: "active", label: "Ativa" },
+                    { value: "completed", label: "Completada" },
+                  ],
+                },
+              ]}
+            />
+            
             <GoalsPageClient goals={goalsData} showTable />
+            
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <ItemsPerPageSelector />
+              
+              {totalPages > 1 ? (
+                <TablePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={totalGoals}
+                  itemsPerPage={itemsPerPage}
+                  itemLabel="metas"
+                />
+              ) : totalGoals > 0 ? (
+                <div className="text-sm text-muted-foreground">
+                  Mostrando todas as {totalGoals} meta{totalGoals !== 1 ? "s" : ""}
+                </div>
+              ) : null}
+            </div>
           </CardContent>
         </Card>
 
