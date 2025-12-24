@@ -12,6 +12,7 @@ import { ItemsPerPageSelector } from "@/components/shared/items-per-page-selecto
 import { RecurringTransactionsWrapper } from "@/components/transactions/recurring-transactions-wrapper";
 import { DEFAULT_ITEMS_PER_PAGE } from "@/constants/ui";
 import { processDueRecurringTransactions } from "@/app/actions/recurring-transactions";
+import type { RecurringTransaction } from "@/components/transactions/recurring-transactions-table";
 
 export default async function TransactionsPage({
   searchParams,

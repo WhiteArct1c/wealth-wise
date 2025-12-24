@@ -1,5 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 export type SortConfig = {
   column: string;
   order: "asc" | "desc";
@@ -10,11 +8,19 @@ export type FilterConfig = {
   [key: string]: string | undefined;
 };
 
+// Tipo genérico para queries do Supabase que suportam filtros
+type SupabaseQuery = {
+  ilike: (column: string, pattern: string) => any;
+  eq: (column: string, value: any) => any;
+  order: (column: string, options?: { ascending?: boolean }) => any;
+  [key: string]: any;
+};
+
 /**
  * Aplica ordenação a uma query do Supabase
  */
-export function applySort<T>(
-  query: ReturnType<SupabaseClient<T>["from"]>,
+export function applySort(
+  query: SupabaseQuery,
   sortColumn: string | null,
   sortOrder: "asc" | "desc" | null,
   defaultSort: { column: string; order: "asc" | "desc" }
@@ -27,8 +33,8 @@ export function applySort<T>(
 /**
  * Aplica filtro de busca (texto) em uma coluna específica
  */
-export function applySearchFilter<T>(
-  query: ReturnType<SupabaseClient<T>["from"]>,
+export function applySearchFilter(
+  query: SupabaseQuery,
   search: string | null,
   searchColumn: string
 ) {
@@ -41,8 +47,8 @@ export function applySearchFilter<T>(
 /**
  * Aplica filtro de igualdade em uma coluna
  */
-export function applyEqualFilter<T>(
-  query: ReturnType<SupabaseClient<T>["from"]>,
+export function applyEqualFilter(
+  query: SupabaseQuery,
   value: string | null,
   column: string
 ) {
@@ -55,8 +61,8 @@ export function applyEqualFilter<T>(
 /**
  * Aplica múltiplos filtros de igualdade
  */
-export function applyFilters<T>(
-  query: ReturnType<SupabaseClient<T>["from"]>,
+export function applyFilters(
+  query: SupabaseQuery,
   filters: FilterConfig,
   filterMap: Record<string, string> // Mapeia chave do filtro para coluna do banco
 ) {
