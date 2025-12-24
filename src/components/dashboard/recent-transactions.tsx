@@ -20,6 +20,7 @@ import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { TRANSACTION_STATUS_LABEL } from "@/constants/status";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { parseLocalDate } from "@/lib/utils";
 
 type Transaction = {
   id: string;
@@ -46,7 +47,7 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
   };
 
   const formatDate = (dateString: string) => {
-    return format(new Date(dateString), "dd/MM/yyyy", { locale: ptBR });
+    return format(parseLocalDate(dateString), "dd/MM/yyyy", { locale: ptBR });
   };
 
   if (transactions.length === 0) {
