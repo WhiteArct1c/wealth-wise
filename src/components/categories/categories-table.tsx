@@ -33,6 +33,7 @@ import { useState } from "react";
 import { deleteCategory } from "@/app/actions/categories";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { TableSortHeader } from "@/components/shared/table-sort-header";
 
 export type Category = {
   id: string;
@@ -121,9 +122,15 @@ export function CategoriesTable({ categories, onEdit }: CategoriesTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Orçamento</TableHead>
+              <TableHead>
+                <TableSortHeader column="name">Nome</TableSortHeader>
+              </TableHead>
+              <TableHead>
+                <TableSortHeader column="type">Tipo</TableSortHeader>
+              </TableHead>
+              <TableHead>
+                <TableSortHeader column="budget_type">Orçamento</TableSortHeader>
+              </TableHead>
               <TableHead>Cor</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>

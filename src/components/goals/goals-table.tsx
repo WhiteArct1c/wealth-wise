@@ -40,6 +40,8 @@ import { useState } from "react";
 import { deleteGoal } from "@/app/actions/goals";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { parseLocalDate } from "@/lib/utils";
+import { TableSortHeader } from "@/components/shared/table-sort-header";
 import type { Goal } from "@/contexts/goals-context";
 import { GoalContributionForm } from "./goal-contribution-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -110,7 +112,7 @@ export function GoalsTable({ goals, onEdit }: GoalsTableProps) {
 
   const formatDate = (date: string | null) => {
     if (!date) return "-";
-    const d = new Date(date);
+    const d = parseLocalDate(date);
     if (Number.isNaN(d.getTime())) return "-";
     return d.toLocaleDateString("pt-BR");
   };
@@ -134,11 +136,19 @@ export function GoalsTable({ goals, onEdit }: GoalsTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Meta</TableHead>
+              <TableHead>
+                <TableSortHeader column="name">Meta</TableSortHeader>
+              </TableHead>
               <TableHead>Progresso</TableHead>
-              <TableHead className="text-right">Acumulado</TableHead>
-              <TableHead className="text-right">Meta</TableHead>
-              <TableHead>Data limite</TableHead>
+              <TableHead className="text-right">
+                <TableSortHeader column="current_amount" className="justify-end">Acumulado</TableSortHeader>
+              </TableHead>
+              <TableHead className="text-right">
+                <TableSortHeader column="target_amount" className="justify-end">Meta</TableSortHeader>
+              </TableHead>
+              <TableHead>
+                <TableSortHeader column="deadline">Data limite</TableSortHeader>
+              </TableHead>
               <TableHead className="text-center">Status</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>

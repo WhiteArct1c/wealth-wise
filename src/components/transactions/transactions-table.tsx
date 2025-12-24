@@ -35,8 +35,9 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn, parseLocalDate } from "@/lib/utils";
 import { TRANSACTION_STATUS_LABEL } from "@/constants/status";
+import { TableSortHeader } from "@/components/shared/table-sort-header";
 
 export type Transaction = {
   id: string;
@@ -73,7 +74,7 @@ export function TransactionsTable({ transactions, onEdit }: TransactionsTablePro
   };
 
   const formatDate = (dateString: string) => {
-    return format(new Date(dateString), "dd/MM/yyyy", { locale: ptBR });
+    return format(parseLocalDate(dateString), "dd/MM/yyyy", { locale: ptBR });
   };
 
   const handleDeleteClick = (transaction: Transaction) => {
@@ -115,12 +116,24 @@ export function TransactionsTable({ transactions, onEdit }: TransactionsTablePro
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Data</TableHead>
-              <TableHead>Descrição</TableHead>
-              <TableHead>Categoria</TableHead>
-              <TableHead>Conta</TableHead>
-              <TableHead className="text-right">Valor</TableHead>
-              <TableHead className="text-center">Status</TableHead>
+              <TableHead>
+                <TableSortHeader column="date">Data</TableSortHeader>
+              </TableHead>
+              <TableHead>
+                <TableSortHeader column="description">Descrição</TableSortHeader>
+              </TableHead>
+              <TableHead>
+                <TableSortHeader column="category">Categoria</TableSortHeader>
+              </TableHead>
+              <TableHead>
+                <TableSortHeader column="account">Conta</TableSortHeader>
+              </TableHead>
+              <TableHead className="text-right">
+                <TableSortHeader column="amount" className="justify-end">Valor</TableSortHeader>
+              </TableHead>
+              <TableHead className="text-center">
+                <TableSortHeader column="status" className="justify-center">Status</TableSortHeader>
+              </TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>

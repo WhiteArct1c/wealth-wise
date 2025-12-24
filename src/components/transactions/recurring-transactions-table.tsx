@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,14 +29,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, Pause, Play, X, Repeat, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { MoreHorizontal, Pause, Play, X, Repeat, ArrowUpCircle, ArrowDownCircle, TrendingUp, TrendingDown, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { setRecurringStatus } from "@/app/actions/recurring-transactions";
+import { setRecurringStatus, deleteRecurringTransaction } from "@/app/actions/recurring-transactions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn, parseLocalDate } from "@/lib/utils";
+import { TableSortHeader } from "@/components/shared/table-sort-header";
 
 export type RecurringTransaction = {
   id: string;
@@ -57,6 +59,9 @@ export type RecurringTransaction = {
 
 type RecurringTransactionsTableProps = {
   recurringTransactions: RecurringTransaction[];
+  accounts: Array<{ id: string; name: string }>;
+  categories: Array<{ id: string; name: string; type: "INCOME" | "EXPENSE"; color_hex: string | null }>;
+  onEdit?: (recurring: RecurringTransaction) => void;
 };
 
 const frequencyLabels: Record<RecurringTransaction["frequency"], string> = {
@@ -68,9 +73,14 @@ const frequencyLabels: Record<RecurringTransaction["frequency"], string> = {
 
 export function RecurringTransactionsTable({
   recurringTransactions,
+  accounts,
+  categories,
+  onEdit,
 }: RecurringTransactionsTableProps) {
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recurringToUpdate, setRecurringToUpdate] = useState<RecurringTransaction | null>(null);
+  const [recurringToDelete, setRecurringToDelete] = useState<RecurringTransaction | null>(null);
   const [newStatus, setNewStatus] = useState<"ACTIVE" | "PAUSED" | "CANCELLED" | null>(null);
   const router = useRouter();
 
@@ -82,7 +92,7 @@ export function RecurringTransactionsTable({
   };
 
   const formatDate = (dateString: string) => {
-    return format(new Date(dateString), "dd/MM/yyyy", { locale: ptBR });
+    return format(parseLocalDate(dateString), "dd/MM/yyyy", { locale: ptBR });
   };
 
   const handleStatusChange = async (recurring: RecurringTransaction, status: "ACTIVE" | "PAUSED" | "CANCELLED") => {
@@ -111,6 +121,47 @@ export function RecurringTransactionsTable({
     setNewStatus(null);
   };
 
+  const handleDeleteClick = (recurring: RecurringTransaction) => {
+    setRecurringToDelete(recurring);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!recurringToDelete) return;
+
+    const result = await deleteRecurringTransaction(recurringToDelete.id);
+
+    if (result?.error) {
+      toast.error(result.error);
+    } else {
+      toast.success("Transação recorrente excluída com sucesso!");
+      router.refresh();
+    }
+
+    setDeleteDialogOpen(false);
+    setRecurringToDelete(null);
+  };
+
+  const handleEditClick = (recurring: RecurringTransaction) => {
+    onEdit?.(recurring);
+  };
+
+  // Calcula os totais
+  const totals = recurringTransactions.reduce(
+    (acc, recurring) => {
+      const isIncome = recurring.category?.type === "INCOME" || recurring.type === "INCOME";
+      if (isIncome) {
+        acc.totalIncome += recurring.amount;
+      } else {
+        acc.totalExpenses += recurring.amount;
+      }
+      return acc;
+    },
+    { totalIncome: 0, totalExpenses: 0 }
+  );
+
+  const netTotal = totals.totalIncome - totals.totalExpenses;
+
   if (recurringTransactions.length === 0) {
     return (
       <div className="text-center py-12">
@@ -124,18 +175,92 @@ export function RecurringTransactionsTable({
   }
 
   return (
-    <>
-      <div className="rounded-md border">
+    <div className="w-full min-w-0">
+      {/* Resumo dos totais no topo */}
+      <Card className="mb-4 min-w-0">
+        <CardContent className="pt-6 min-w-0">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-w-0 w-full">
+            {totals.totalIncome > 0 && (
+              <div className="flex items-center justify-between p-4 rounded-lg border bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900 min-w-0">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm text-muted-foreground">Total de Receitas</p>
+                    <p className="text-lg font-semibold text-green-600 dark:text-green-400 truncate">
+                      {formatCurrency(totals.totalIncome)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            {totals.totalExpenses > 0 && (
+              <div className="flex items-center justify-between p-4 rounded-lg border bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900 min-w-0">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm text-muted-foreground">Total de Despesas</p>
+                    <p className="text-lg font-semibold text-red-600 dark:text-red-400 truncate">
+                      {formatCurrency(totals.totalExpenses)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div
+              className={cn(
+                "flex items-center justify-between p-4 rounded-lg border min-w-0",
+                netTotal >= 0
+                  ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900"
+                  : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900"
+              )}
+            >
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                {netTotal >= 0 ? (
+                  <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                ) : (
+                  <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm text-muted-foreground">Total Líquido</p>
+                  <p
+                    className={cn(
+                      "text-lg font-semibold truncate",
+                      netTotal >= 0
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-red-600 dark:text-red-400"
+                    )}
+                  >
+                    {netTotal >= 0 ? "+" : ""}
+                    {formatCurrency(Math.abs(netTotal))}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="rounded-md border w-full min-w-0">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Descrição</TableHead>
+              <TableHead>
+                <TableSortHeader column="description" sortParam="recurringSort" orderParam="recurringOrder" pageParam="recurringPage">Descrição</TableSortHeader>
+              </TableHead>
               <TableHead>Categoria</TableHead>
               <TableHead>Conta</TableHead>
-              <TableHead className="text-right">Valor</TableHead>
-              <TableHead>Frequência</TableHead>
-              <TableHead>Próxima Execução</TableHead>
-              <TableHead className="text-center">Status</TableHead>
+              <TableHead className="text-right">
+                <TableSortHeader column="amount" className="justify-end" sortParam="recurringSort" orderParam="recurringOrder" pageParam="recurringPage">Valor</TableSortHeader>
+              </TableHead>
+              <TableHead>
+                <TableSortHeader column="frequency" sortParam="recurringSort" orderParam="recurringOrder" pageParam="recurringPage">Frequência</TableSortHeader>
+              </TableHead>
+              <TableHead>
+                <TableSortHeader column="next_run_date" sortParam="recurringSort" orderParam="recurringOrder" pageParam="recurringPage">Próxima Execução</TableSortHeader>
+              </TableHead>
+              <TableHead className="text-center">
+                <TableSortHeader column="status" className="justify-center" sortParam="recurringSort" orderParam="recurringOrder" pageParam="recurringPage">Status</TableSortHeader>
+              </TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -226,6 +351,13 @@ export function RecurringTransactionsTable({
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Ações</DropdownMenuLabel>
                         <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleEditClick(recurring)}
+                        >
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         {recurring.status === "ACTIVE" && (
                           <DropdownMenuItem
                             onClick={() => handleStatusChange(recurring, "PAUSED")}
@@ -251,6 +383,14 @@ export function RecurringTransactionsTable({
                             Cancelar
                           </DropdownMenuItem>
                         )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteClick(recurring)}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -308,7 +448,29 @@ export function RecurringTransactionsTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir transação recorrente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A transação recorrente{" "}
+              <strong>{recurringToDelete?.description}</strong> será excluída permanentemente
+              e não gerará mais transações automáticas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
 

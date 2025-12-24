@@ -33,6 +33,7 @@ import { useState } from "react";
 import { deleteAccount } from "@/app/actions/accounts";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { TableSortHeader } from "@/components/shared/table-sort-header";
 
 export type Account = {
   id: string;
@@ -119,10 +120,18 @@ export function AccountsTable({ accounts, onEdit }: AccountsTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead className="text-right">Saldo Atual</TableHead>
-              <TableHead className="text-center">Status</TableHead>
+              <TableHead>
+                <TableSortHeader column="name">Nome</TableSortHeader>
+              </TableHead>
+              <TableHead>
+                <TableSortHeader column="type">Tipo</TableSortHeader>
+              </TableHead>
+              <TableHead className="text-right">
+                <TableSortHeader column="current_balance" className="justify-end">Saldo Atual</TableSortHeader>
+              </TableHead>
+              <TableHead className="text-center">
+                <TableSortHeader column="is_active" className="justify-center">Status</TableSortHeader>
+              </TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
