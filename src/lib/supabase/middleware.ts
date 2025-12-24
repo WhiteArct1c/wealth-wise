@@ -44,7 +44,11 @@ export async function updateSession(request: NextRequest) {
 
   // Refresh session if expired - required for Server Components
   // https://supabase.com/docs/guides/auth/server-side/nextjs
-  await supabase.auth.getUser();
+  // Only refresh session, don't throw errors if user is not authenticated
+  // Individual pages/components will handle authentication checks
+  await supabase.auth.getUser().catch(() => {
+    // Silently handle auth errors - pages will handle redirects
+  });
 
   // Optional: Redirect unauthenticated users to login
   // Uncomment the code below if you want to protect all routes by default
