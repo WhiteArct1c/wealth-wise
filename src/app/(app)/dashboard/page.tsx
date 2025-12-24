@@ -1,4 +1,3 @@
-import { createClient } from "@/lib/supabase/server";
 import {
   Card,
   CardContent,
@@ -27,7 +26,7 @@ import { ChartTransactionStatus } from "@/components/dashboard/chart-transaction
 import { ChartBalanceEvolution } from "@/components/dashboard/chart-balance-evolution";
 import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { getDashboardOverviewData } from "@/server/dashboard";
-import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -36,7 +35,7 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    return null; // Layout will handle redirect
   }
 
   const {
