@@ -36,8 +36,10 @@ export default async function AppLayout({
       <AppSidebar user={userInfo} />
       <SidebarInset>
         <AppHeader />
-        <main className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-          {children}
+        <main className="flex flex-1 flex-col gap-4 p-4 md:p-6 min-w-0 overflow-hidden">
+          <div className="flex-1 min-w-0 overflow-auto">
+            {children}
+          </div>
         </main>
       </SidebarInset>
     </SidebarProvider>
