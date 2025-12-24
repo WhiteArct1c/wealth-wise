@@ -5,8 +5,30 @@ import { Tag } from "lucide-react";
 import { CategoriesPageClient } from "@/components/categories/categories-page-client";
 import { CategoriesProvider } from "@/contexts/categories-context";
 import { CategoriesEditDialog } from "@/components/categories/categories-edit-dialog";
+import { TablePagination } from "@/components/shared/table-pagination";
+import { TableFilters } from "@/components/shared/table-filters";
+import { ItemsPerPageSelector } from "@/components/shared/items-per-page-selector";
+import { applySort, applySearchFilter } from "@/lib/table-utils";
+import { DEFAULT_ITEMS_PER_PAGE } from "@/constants/ui";
 
-export default async function CategoriesPage() {
+export default async function CategoriesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    page?: string;
+    perPage?: string;
+    sort?: string;
+    order?: "asc" | "desc";
+    search?: string;
+    type?: string;
+    budget_type?: string;
+  }>;
+}) {
+  const params = await searchParams;
+  const itemsPerPage = Math.max(2, Math.min(100, parseInt(params.perPage || DEFAULT_ITEMS_PER_PAGE.toString(), 10)));
+  const currentPage = Math.max(1, parseInt(params.page || "1", 10));
+  const offset = (currentPage - 1) * itemsPerPage;
+  
   const supabase = await createClient();
   const {
     data: { user },
@@ -16,24 +38,56 @@ export default async function CategoriesPage() {
     redirect("/login");
   }
 
-  // Buscar categorias do usuário
-  const { data: categories, error } = await supabase
+  // Query base
+  let categoriesQuery = supabase
     .from("categories")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+    .select("*", { count: "exact" })
+    .eq("user_id", user.id);
+
+  // Aplicar busca
+  if (params.search) {
+    categoriesQuery = applySearchFilter(categoriesQuery, params.search, "name");
+  }
+
+  // Aplicar filtros
+  if (params.type) {
+    categoriesQuery = categoriesQuery.eq("type", params.type);
+  }
+  if (params.budget_type) {
+    categoriesQuery = categoriesQuery.eq("budget_type", params.budget_type);
+  }
+
+  // Aplicar ordenação
+  const sortColumn = params.sort || "created_at";
+  const sortOrder = params.order || "desc";
+  categoriesQuery = applySort(categoriesQuery, sortColumn, sortOrder, { column: "created_at", order: "desc" });
+
+  // Aplicar paginação
+  categoriesQuery = categoriesQuery.range(offset, offset + itemsPerPage - 1);
+
+  const { data: categories, error, count } = await categoriesQuery;
 
   if (error) {
     console.error("Erro ao buscar categorias:", error);
   }
 
   const categoriesData = categories || [];
+  const totalCategories = count || 0;
+  const totalPages = Math.ceil(totalCategories / itemsPerPage);
+
+  // Buscar TODAS as categorias para calcular estatísticas (sem paginação)
+  const { data: allCategories } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("user_id", user.id);
+
+  const allCategoriesData = allCategories || [];
 
   // Calcular estatísticas
-  const totalCategories = categoriesData.length;
-  const incomeCategories = categoriesData.filter((c) => c.type === "INCOME").length;
-  const expenseCategories = categoriesData.filter((c) => c.type === "EXPENSE").length;
-  const categoriesWithBudget = categoriesData.filter((c) => c.budget_type !== null).length;
+  const totalCategoriesCount = allCategoriesData.length;
+  const incomeCategories = allCategoriesData.filter((c) => c.type === "INCOME").length;
+  const expenseCategories = allCategoriesData.filter((c) => c.type === "EXPENSE").length;
+  const categoriesWithBudget = allCategoriesData.filter((c) => c.budget_type !== null).length;
 
   return (
     <CategoriesProvider>
@@ -57,7 +111,7 @@ export default async function CategoriesPage() {
               <Tag className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalCategories}</div>
+              <div className="text-2xl font-bold">{totalCategoriesCount}</div>
               <p className="text-xs text-muted-foreground">
                 Categorias criadas
               </p>
@@ -116,8 +170,52 @@ export default async function CategoriesPage() {
               Todas as suas categorias de receitas e despesas
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <TableFilters
+              searchPlaceholder="Buscar por nome..."
+              searchKey="search"
+              selectFilters={[
+                {
+                  key: "type",
+                  label: "Tipo",
+                  placeholder: "Todos os tipos",
+                  options: [
+                    { value: "INCOME", label: "Receita" },
+                    { value: "EXPENSE", label: "Despesa" },
+                  ],
+                },
+                {
+                  key: "budget_type",
+                  label: "Tipo de Orçamento",
+                  placeholder: "Todos",
+                  options: [
+                    { value: "ESSENTIAL_FIXED", label: "Essencial Fixo" },
+                    { value: "ESSENTIAL_VARIABLE", label: "Essencial Variável" },
+                    { value: "DISCRETIONARY", label: "Discricionário" },
+                  ],
+                },
+              ]}
+            />
+            
             <CategoriesPageClient categories={categoriesData} showTable />
+            
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <ItemsPerPageSelector />
+              
+              {totalPages > 1 ? (
+                <TablePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={totalCategories}
+                  itemsPerPage={itemsPerPage}
+                  itemLabel="categorias"
+                />
+              ) : totalCategories > 0 ? (
+                <div className="text-sm text-muted-foreground">
+                  Mostrando todas as {totalCategories} categoria{totalCategories !== 1 ? "s" : ""}
+                </div>
+              ) : null}
+            </div>
           </CardContent>
         </Card>
 
