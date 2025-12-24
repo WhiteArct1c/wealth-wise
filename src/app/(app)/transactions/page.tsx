@@ -6,16 +6,34 @@ import { Receipt, ArrowUpCircle, ArrowDownCircle, Repeat } from "lucide-react";
 import { TransactionsPageClient } from "@/components/transactions/transactions-page-client";
 import { TransactionsProvider } from "@/contexts/transactions-context";
 import { TransactionsEditDialog } from "@/components/transactions/transactions-edit-dialog";
-import { TransactionsPagination } from "@/components/transactions/transactions-pagination";
-import { ItemsPerPageSelector } from "@/components/transactions/items-per-page-selector";
-import { RecurringTransactionsTable, type RecurringTransaction } from "@/components/transactions/recurring-transactions-table";
+import { TablePagination } from "@/components/shared/table-pagination";
+import { TableFilters } from "@/components/shared/table-filters";
+import { ItemsPerPageSelector } from "@/components/shared/items-per-page-selector";
+import { RecurringTransactionsWrapper } from "@/components/transactions/recurring-transactions-wrapper";
 import { DEFAULT_ITEMS_PER_PAGE } from "@/constants/ui";
 import { processDueRecurringTransactions } from "@/app/actions/recurring-transactions";
 
 export default async function TransactionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; perPage?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    perPage?: string;
+    sort?: string;
+    order?: "asc" | "desc";
+    search?: string;
+    account?: string;
+    category?: string;
+    status?: string;
+    type?: string;
+    recurringPage?: string;
+    recurringPerPage?: string;
+    recurringSort?: string;
+    recurringOrder?: "asc" | "desc";
+    recurringSearch?: string;
+    recurringStatus?: string;
+    recurringType?: string;
+  }>;
 }) {
   const params = await searchParams;
   const itemsPerPage = Math.max(2, Math.min(100, parseInt(params.perPage || DEFAULT_ITEMS_PER_PAGE.toString(), 10)));
@@ -33,30 +51,77 @@ export default async function TransactionsPage({
   // Gera transações recorrentes vencidas antes de carregar os dados
   await processDueRecurringTransactions(user.id);
 
-  // Buscar total de transações para calcular páginas
-  const { count: totalCount } = await supabase
-    .from("transactions")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", user.id);
-
-  const totalTransactions = totalCount || 0;
-  const totalPages = Math.ceil(totalTransactions / itemsPerPage);
-
-  // Buscar transações do usuário com relacionamentos (paginadas)
-  const { data: transactions, error: transactionsError } = await supabase
+  // Buscar todas as transações primeiro (para aplicar filtros e ordenação)
+  const { data: allTransactionsForFilter } = await supabase
     .from("transactions")
     .select(`
       *,
       account:accounts(id, name),
       category:categories(id, name, type, color_hex)
     `)
-    .eq("user_id", user.id)
-    .order("date", { ascending: false })
-    .range(offset, offset + itemsPerPage - 1);
+    .eq("user_id", user.id);
 
-  if (transactionsError) {
-    console.error("Erro ao buscar transações:", transactionsError);
+  let filteredTransactions = allTransactionsForFilter || [];
+
+  // Aplicar busca
+  if (params.search) {
+    filteredTransactions = filteredTransactions.filter((t) =>
+      t.description?.toLowerCase().includes(params.search!.toLowerCase())
+    );
   }
+
+  // Aplicar filtros
+  if (params.account) {
+    filteredTransactions = filteredTransactions.filter((t) => t.account_id === params.account);
+  }
+  if (params.category) {
+    filteredTransactions = filteredTransactions.filter((t) => t.category_id === params.category);
+  }
+  if (params.status) {
+    filteredTransactions = filteredTransactions.filter((t) => t.status === params.status);
+  }
+  if (params.type) {
+    filteredTransactions = filteredTransactions.filter((t) => {
+      const category = Array.isArray(t.category) ? t.category[0] : t.category;
+      return category?.type === params.type;
+    });
+  }
+
+  // Aplicar ordenação
+  const sortColumn = params.sort || "date";
+  const sortOrder = params.order || "desc";
+  filteredTransactions.sort((a, b) => {
+    let aVal: any = a[sortColumn as keyof typeof a];
+    let bVal: any = b[sortColumn as keyof typeof b];
+    
+    // Tratamento especial para relacionamentos
+    if (sortColumn === "account") {
+      aVal = Array.isArray(a.account) ? a.account[0]?.name : a.account?.name;
+      bVal = Array.isArray(b.account) ? b.account[0]?.name : b.account?.name;
+    } else if (sortColumn === "category") {
+      aVal = Array.isArray(a.category) ? a.category[0]?.name : a.category?.name;
+      bVal = Array.isArray(b.category) ? b.category[0]?.name : b.category?.name;
+    }
+    
+    if (aVal === null || aVal === undefined) aVal = "";
+    if (bVal === null || bVal === undefined) bVal = "";
+    
+    if (typeof aVal === "string") {
+      aVal = aVal.toLowerCase();
+      bVal = bVal.toLowerCase();
+    }
+    
+    if (sortOrder === "asc") {
+      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+    } else {
+      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+    }
+  });
+
+  // Aplicar paginação
+  const totalTransactions = filteredTransactions.length;
+  const totalPages = Math.ceil(totalTransactions / itemsPerPage);
+  const transactionsData = filteredTransactions.slice(offset, offset + itemsPerPage);
 
   // Buscar TODAS as transações para calcular estatísticas (apenas totais)
   const { data: allTransactions } = await supabase
@@ -83,8 +148,12 @@ export default async function TransactionsPage({
     .eq("user_id", user.id)
     .order("name");
 
-  // Buscar regras de recorrência ativas
-  const { data: recurringTransactions } = await supabase
+  // Buscar todas as transações recorrentes (com paginação, ordenação e filtros)
+  const recurringPage = Math.max(1, parseInt(params.recurringPage || "1", 10));
+  const recurringPerPage = Math.max(2, Math.min(100, parseInt(params.recurringPerPage || DEFAULT_ITEMS_PER_PAGE.toString(), 10)));
+  const recurringOffset = (recurringPage - 1) * recurringPerPage;
+
+  const { data: allRecurringTransactions } = await supabase
     .from("recurring_transactions")
     .select(`
       *,
@@ -92,14 +161,91 @@ export default async function TransactionsPage({
       category:categories(id, name, type, color_hex)
     `)
     .eq("user_id", user.id)
-    .in("status", ["ACTIVE", "PAUSED"])
-    .order("next_run_date", { ascending: true });
+    .in("status", ["ACTIVE", "PAUSED"]);
 
-  const transactionsData = transactions || [];
+  let filteredRecurring = (allRecurringTransactions || []) as unknown as RecurringTransaction[];
+
+  // Aplicar busca
+  if (params.recurringSearch) {
+    filteredRecurring = filteredRecurring.filter((r) =>
+      r.description?.toLowerCase().includes(params.recurringSearch!.toLowerCase())
+    );
+  }
+
+  // Aplicar filtro de status
+  if (params.recurringStatus) {
+    filteredRecurring = filteredRecurring.filter((r) => 
+      r.status.toLowerCase() === params.recurringStatus!.toLowerCase()
+    );
+  }
+
+  // Aplicar filtro de tipo
+  if (params.recurringType) {
+    filteredRecurring = filteredRecurring.filter((r) => {
+      const categoryType = r.category?.type || r.type;
+      return categoryType === params.recurringType;
+    });
+  }
+
+  // Aplicar ordenação
+  const recurringSort = params.recurringSort || "next_run_date";
+  const recurringOrder = params.recurringOrder || "asc";
+  filteredRecurring.sort((a, b) => {
+    let aVal: any = a[recurringSort as keyof typeof a];
+    let bVal: any = b[recurringSort as keyof typeof b];
+    
+    // Tratamento especial para relacionamentos
+    if (recurringSort === "account") {
+      aVal = a.account?.name || "";
+      bVal = b.account?.name || "";
+    } else if (recurringSort === "category") {
+      aVal = a.category?.name || "";
+      bVal = b.category?.name || "";
+    }
+    
+    // Tratamento especial para valores numéricos (amount)
+    if (recurringSort === "amount") {
+      aVal = a.amount || 0;
+      bVal = b.amount || 0;
+      return recurringOrder === "asc" ? aVal - bVal : bVal - aVal;
+    }
+    
+    // Tratamento especial para datas (next_run_date, start_date, end_date)
+    if (recurringSort === "next_run_date" || recurringSort === "start_date" || recurringSort === "end_date") {
+      aVal = aVal ? new Date(aVal).getTime() : 0;
+      bVal = bVal ? new Date(bVal).getTime() : 0;
+      return recurringOrder === "asc" ? aVal - bVal : bVal - aVal;
+    }
+    
+    if (aVal === null || aVal === undefined) aVal = "";
+    if (bVal === null || bVal === undefined) bVal = "";
+    
+    // Tratamento para valores numéricos
+    if (typeof aVal === "number" && typeof bVal === "number") {
+      return recurringOrder === "asc" ? aVal - bVal : bVal - aVal;
+    }
+    
+    // Tratamento para strings
+    if (typeof aVal === "string") {
+      aVal = aVal.toLowerCase();
+      bVal = bVal.toLowerCase();
+    }
+    
+    if (recurringOrder === "asc") {
+      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+    } else {
+      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+    }
+  });
+
+  // Aplicar paginação
+  const totalRecurring = filteredRecurring.length;
+  const totalRecurringPages = Math.ceil(totalRecurring / recurringPerPage);
+  const recurringTransactionsData = filteredRecurring.slice(recurringOffset, recurringOffset + recurringPerPage);
+
   const accountsData = accounts || [];
   const categoriesData = categories || [];
   const allTransactionsData = allTransactions || [];
-  const recurringTransactionsData = (recurringTransactions || []) as unknown as RecurringTransaction[];
 
   // Calcular estatísticas usando TODAS as transações
   const incomeTransactions = allTransactionsData.filter(
@@ -219,15 +365,15 @@ export default async function TransactionsPage({
         </div>
 
         {/* Tabela de Transações com Tabs */}
-        <Card className="transition-all duration-200">
+        <Card className="transition-all duration-200 min-w-0">
           <CardHeader>
             <CardTitle>Lista de Transações</CardTitle>
             <CardDescription>
               Gerencie suas transações e regras de recorrência
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="all" className="space-y-4">
+          <CardContent className="min-w-0">
+            <Tabs defaultValue="all" className="space-y-4 w-full min-w-0">
               <TabsList>
                 <TabsTrigger value="all" className="flex items-center gap-2">
                   <Receipt className="h-4 w-4" />
@@ -235,11 +381,54 @@ export default async function TransactionsPage({
                 </TabsTrigger>
                 <TabsTrigger value="recurring" className="flex items-center gap-2">
                   <Repeat className="h-4 w-4" />
-                  Recorrentes ({recurringTransactionsData.length})
+                  Recorrentes ({totalRecurring})
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="all" className="space-y-4">
+                <TableFilters
+                  searchPlaceholder="Buscar por descrição..."
+                  searchKey="search"
+                  selectFilters={[
+                    {
+                      key: "account",
+                      label: "Conta",
+                      placeholder: "Todas as contas",
+                      options: accountsData.map((acc) => ({
+                        value: acc.id,
+                        label: acc.name,
+                      })),
+                    },
+                    {
+                      key: "category",
+                      label: "Categoria",
+                      placeholder: "Todas as categorias",
+                      options: categoriesData.map((cat) => ({
+                        value: cat.id,
+                        label: cat.name,
+                      })),
+                    },
+                    {
+                      key: "status",
+                      label: "Status",
+                      placeholder: "Todos os status",
+                      options: [
+                        { value: "PENDING", label: "Pendente" },
+                        { value: "PAID", label: "Paga" },
+                      ],
+                    },
+                    {
+                      key: "type",
+                      label: "Tipo",
+                      placeholder: "Todos os tipos",
+                      options: [
+                        { value: "INCOME", label: "Receita" },
+                        { value: "EXPENSE", label: "Despesa" },
+                      ],
+                    },
+                  ]}
+                />
+                
                 <TransactionsPageClient
                   transactions={transactionsData}
                   accounts={accountsData}
@@ -248,14 +437,15 @@ export default async function TransactionsPage({
                 />
                 
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <ItemsPerPageSelector defaultValue={DEFAULT_ITEMS_PER_PAGE} />
+                  <ItemsPerPageSelector />
                   
                   {totalPages > 1 ? (
-                    <TransactionsPagination
+                    <TablePagination
                       currentPage={currentPage}
                       totalPages={totalPages}
                       totalItems={totalTransactions}
                       itemsPerPage={itemsPerPage}
+                      itemLabel="transações"
                     />
                   ) : totalTransactions > 0 ? (
                     <div className="text-sm text-muted-foreground">
@@ -265,10 +455,55 @@ export default async function TransactionsPage({
                 </div>
               </TabsContent>
 
-              <TabsContent value="recurring" className="space-y-4">
-                <RecurringTransactionsTable
-                  recurringTransactions={recurringTransactionsData}
+              <TabsContent value="recurring" className="space-y-4 min-w-0">
+                <TableFilters
+                  searchPlaceholder="Buscar por descrição..."
+                  searchKey="recurringSearch"
+                  selectFilters={[
+                    {
+                      key: "recurringStatus",
+                      label: "Status",
+                      placeholder: "Todos os status",
+                      options: [
+                        { value: "active", label: "Ativa" },
+                        { value: "paused", label: "Pausada" },
+                      ],
+                    },
+                    {
+                      key: "recurringType",
+                      label: "Tipo",
+                      placeholder: "Todos os tipos",
+                      options: [
+                        { value: "INCOME", label: "Receita" },
+                        { value: "EXPENSE", label: "Despesa" },
+                      ],
+                    },
+                  ]}
                 />
+                
+                <RecurringTransactionsWrapper
+                  recurringTransactions={recurringTransactionsData}
+                  accounts={accountsData}
+                  categories={categoriesData}
+                />
+                
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <ItemsPerPageSelector />
+                  
+                  {totalRecurringPages > 1 ? (
+                    <TablePagination
+                      currentPage={recurringPage}
+                      totalPages={totalRecurringPages}
+                      totalItems={totalRecurring}
+                      itemsPerPage={recurringPerPage}
+                      itemLabel="transações recorrentes"
+                    />
+                  ) : totalRecurring > 0 ? (
+                    <div className="text-sm text-muted-foreground">
+                      Mostrando todas as {totalRecurring} transação{totalRecurring !== 1 ? "ões" : ""} recorrente{totalRecurring !== 1 ? "s" : ""}
+                    </div>
+                  ) : null}
+                </div>
               </TabsContent>
             </Tabs>
           </CardContent>
