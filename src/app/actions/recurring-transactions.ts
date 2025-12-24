@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { Tables, TablesUpdate } from "@/lib/supabase/types";
 import { createTransaction } from "@/app/actions/transactions";
 import type { TransactionFormValues } from "@/lib/validations/transaction";
+import { revalidatePath } from "next/cache";
 
 const recurringSchema = z.object({
   account_id: z.string().min(1, "Conta é obrigatória"),
@@ -231,6 +232,9 @@ export async function updateRecurringTransaction(
     };
   }
 
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+
   return {
     success: true,
     data,
@@ -280,6 +284,50 @@ export async function setRecurringStatus(
   return {
     success: true,
     data,
+  };
+}
+
+export async function deleteRecurringTransaction(id: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      error: "Usuário não autenticado",
+    };
+  }
+
+  // Verifica se a recorrência pertence ao usuário
+  const { data: recurring } = await supabase
+    .from("recurring_transactions")
+    .select("user_id")
+    .eq("id", id)
+    .single();
+
+  if (!recurring || recurring.user_id !== user.id) {
+    return {
+      error: "Recorrência não encontrada ou sem permissão",
+    };
+  }
+
+  const { error } = await supabase
+    .from("recurring_transactions")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    return {
+      error: error.message,
+    };
+  }
+
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+
+  return {
+    success: true,
   };
 }
 
