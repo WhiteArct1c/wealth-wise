@@ -202,6 +202,11 @@ export async function contributeToGoal(input: ContributeToGoalInput) {
       category_id: true,
       status: true,
       payment_date: true,
+      is_recurring: true,
+      frequency: true,
+      day_of_month: true,
+      recurring_start_date: true,
+      recurring_end_date: true,
     })
     .safeParse({
       account_id: input.account_id,
