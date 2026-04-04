@@ -30,6 +30,20 @@ function getSixMonthsRangeEnd(): Date[] {
   return months;
 }
 
+/**
+ * Fetches and computes all data needed to render the dashboard overview.
+ *
+ * **Side effect:** calls `processDueRecurringTransactions` before querying,
+ * so visiting the dashboard triggers automatic creation of overdue recurring
+ * transactions.
+ *
+ * All monetary values in the returned object are in **reais** (the DB unit),
+ * except `RecentDashboardTransaction.amount` which is converted to **centavos**
+ * (integer) for display formatting on the client.
+ *
+ * @param userId - The authenticated user's ID
+ * @returns Aggregated dashboard data including balance, cash flow, goals, and charts
+ */
 export async function getDashboardOverviewData(
   userId: string
 ): Promise<DashboardOverviewData> {

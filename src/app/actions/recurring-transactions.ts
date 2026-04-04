@@ -6,6 +6,7 @@ import type { Tables, TablesUpdate } from "@/lib/supabase/types";
 import { createTransaction } from "@/app/actions/transactions";
 import type { TransactionFormValues } from "@/lib/validations/transaction";
 import { revalidatePath } from "next/cache";
+import { getNextRunDate } from "@/lib/date-utils";
 
 const recurringSchema = z.object({
   account_id: z.string().min(1, "Conta é obrigatória"),
@@ -25,43 +26,6 @@ const recurringSchema = z.object({
 });
 
 export type RecurringFormValues = z.infer<typeof recurringSchema>;
-
-function getNextRunDate(
-  current: Date,
-  frequency: Tables<"recurring_transactions">["frequency"],
-  dayOfMonth?: number | null
-): Date {
-  const d = new Date(current);
-
-  switch (frequency) {
-    case "DAILY":
-      d.setDate(d.getDate() + 1);
-      break;
-    case "WEEKLY":
-      d.setDate(d.getDate() + 7);
-      break;
-    case "MONTHLY": {
-      const day = dayOfMonth ?? d.getDate();
-      d.setMonth(d.getMonth() + 1);
-      const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-      d.setDate(Math.min(day, lastDay));
-      break;
-    }
-    case "YEARLY": {
-      const day = dayOfMonth ?? d.getDate();
-      const month = d.getMonth();
-      d.setFullYear(d.getFullYear() + 1);
-      const lastDay = new Date(d.getFullYear(), month + 1, 0).getDate();
-      d.setMonth(month);
-      d.setDate(Math.min(day, lastDay));
-      break;
-    }
-    default:
-      break;
-  }
-
-  return d;
-}
 
 export async function createRecurringTransaction(
   formData: RecurringFormValues
@@ -169,6 +133,14 @@ export async function updateRecurringTransaction(
   id: string,
   formData: Partial<RecurringFormValues>
 ) {
+  const partialValidation = recurringSchema.partial().safeParse(formData);
+  if (!partialValidation.success) {
+    return {
+      error: "Dados inválidos",
+      details: partialValidation.error.issues,
+    };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -218,6 +190,7 @@ export async function updateRecurringTransaction(
   if (formData.end_date !== undefined) {
     updateData.end_date = formData.end_date || null;
   }
+  updateData.updated_at = new Date().toISOString();
 
   const { data, error } = await supabase
     .from("recurring_transactions")
@@ -331,6 +304,22 @@ export async function deleteRecurringTransaction(id: string) {
   };
 }
 
+/**
+ * Processes all recurring transactions that are due today or overdue for a user.
+ *
+ * For each due record:
+ * 1. Creates a real transaction via `createTransaction` (amounts converted from reais → centavos).
+ * 2. Advances `next_run_date` using `getNextRunDate`.
+ * 3. Cancels the rule if `next_run_date` would exceed `end_date`.
+ *
+ * Failures (e.g. insufficient balance) are silently skipped — the rule is NOT
+ * advanced and will be retried on the next call.
+ *
+ * Called automatically by `getDashboardOverviewData` on every dashboard load.
+ *
+ * @param userId - The authenticated user's ID
+ * @returns `{ processed: number }` — count of successfully created transactions
+ */
 export async function processDueRecurringTransactions(userId: string) {
   const supabase = await createClient();
 
