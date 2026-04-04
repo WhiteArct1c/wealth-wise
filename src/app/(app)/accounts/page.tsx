@@ -3,12 +3,12 @@ import { redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wallet } from "lucide-react";
 import { AccountsPageClient } from "@/components/accounts/accounts-page-client";
-import { AccountsProvider } from "@/contexts/accounts-context";
+import { AccountsProvider } from "@/contexts";
 import { AccountsEditDialog } from "@/components/accounts/accounts-edit-dialog";
 import { TablePagination } from "@/components/shared/table-pagination";
 import { TableFilters } from "@/components/shared/table-filters";
 import { ItemsPerPageSelector } from "@/components/shared/items-per-page-selector";
-import { applySort, applySearchFilter, type SortConfig } from "@/lib/table-utils";
+
 import { DEFAULT_ITEMS_PER_PAGE } from "@/constants/ui";
 
 export default async function AccountsPage({
@@ -38,31 +38,8 @@ export default async function AccountsPage({
     redirect("/login");
   }
 
-  // Query base
-  let accountsQuery = supabase
-    .from("accounts")
-    .select("*", { count: "exact" })
-    .eq("user_id", user.id);
-
-  // Aplicar busca
-  if (params.search) {
-    accountsQuery = applySearchFilter(accountsQuery, params.search, "name");
-  }
-
-  // Aplicar filtros
-  if (params.type) {
-    accountsQuery = accountsQuery.eq("type", params.type);
-  }
-  if (params.status) {
-    if (params.status === "active") {
-      accountsQuery = accountsQuery.eq("is_active", true);
-    } else if (params.status === "inactive") {
-      accountsQuery = accountsQuery.eq("is_active", false);
-    }
-  }
-
   // Buscar todas as contas primeiro (para calcular saldo e ordenar)
-  const { data: allAccounts, error, count } = await supabase
+  const { data: allAccounts, error } = await supabase
     .from("accounts")
     .select("*")
     .eq("user_id", user.id);
@@ -72,7 +49,6 @@ export default async function AccountsPage({
   }
 
   const allAccountsData = allAccounts || [];
-  const totalAccounts = count || 0;
 
   // Buscar transações por conta para calcular saldo atual (derivado)
   const { data: accountTransactions = [] } = await supabase
@@ -130,34 +106,29 @@ export default async function AccountsPage({
   const sortColumn = params.sort || "created_at";
   const sortOrder = params.order || "desc";
   accountsWithBalance.sort((a, b) => {
-    let aVal: any = a[sortColumn as keyof typeof a];
-    let bVal: any = b[sortColumn as keyof typeof b];
-    
-    // Tratamento especial para current_balance
+    const rawA = a[sortColumn as keyof typeof a];
+    const rawB = b[sortColumn as keyof typeof b];
+
+    let aComp: string | number;
+    let bComp: string | number;
+
     if (sortColumn === "initial_balance" || sortColumn === "current_balance") {
-      aVal = sortColumn === "current_balance" ? a.current_balance : (a.initial_balance || 0);
-      bVal = sortColumn === "current_balance" ? b.current_balance : (b.initial_balance || 0);
-    }
-    
-    if (aVal === null || aVal === undefined) aVal = sortColumn.includes("balance") ? 0 : "";
-    if (bVal === null || bVal === undefined) bVal = sortColumn.includes("balance") ? 0 : "";
-    
-    // Tratamento para valores numéricos
-    if (typeof aVal === "number" && typeof bVal === "number") {
-      return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
-    }
-    
-    // Tratamento para strings
-    if (typeof aVal === "string") {
-      aVal = aVal.toLowerCase();
-      bVal = bVal.toLowerCase();
-    }
-    
-    if (sortOrder === "asc") {
-      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      aComp = sortColumn === "current_balance" ? a.current_balance : (a.initial_balance || 0);
+      bComp = sortColumn === "current_balance" ? b.current_balance : (b.initial_balance || 0);
     } else {
-      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      aComp = (typeof rawA === "string" || typeof rawA === "number") ? rawA : (sortColumn.includes("balance") ? 0 : "");
+      bComp = (typeof rawB === "string" || typeof rawB === "number") ? rawB : (sortColumn.includes("balance") ? 0 : "");
     }
+
+    if (typeof aComp === "number" && typeof bComp === "number") {
+      return sortOrder === "asc" ? aComp - bComp : bComp - aComp;
+    }
+
+    const aStr = String(aComp).toLowerCase();
+    const bStr = String(bComp).toLowerCase();
+    return sortOrder === "asc"
+      ? aStr > bStr ? 1 : aStr < bStr ? -1 : 0
+      : aStr < bStr ? 1 : aStr > bStr ? -1 : 0;
   });
 
   // Contar total após filtros (mas antes da paginação)
@@ -284,7 +255,7 @@ export default async function AccountsPage({
             ]}
           />
           
-          <AccountsPageClient accounts={accountsWithBalance} showTable />
+          <AccountsPageClient accounts={accountsData} showTable />
           
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <ItemsPerPageSelector />

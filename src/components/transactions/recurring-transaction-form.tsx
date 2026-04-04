@@ -28,10 +28,10 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { z } from "zod";
 import { Loader2, CalendarIcon } from "lucide-react";
-import { toast } from "sonner";
 import { createRecurringTransaction, updateRecurringTransaction, type RecurringFormValues } from "@/app/actions/recurring-transactions";
 import { useState } from "react";
-import { cn, parseLocalDate } from "@/lib/utils";
+import { useServerAction } from "@/hooks/use-server-action";
+import { cn, parseLocalDate, formatCurrencyInput } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -60,15 +60,6 @@ type RecurringTransactionFormProps = {
   onSuccess?: () => void;
 };
 
-// Função para formatar valor como moeda brasileira (recebe centavos, retorna string formatada)
-const formatCurrency = (value: number): string => {
-  if (!value && value !== 0) return "";
-  return new Intl.NumberFormat("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value / 100);
-};
-
 export function RecurringTransactionForm({
   recurringId,
   defaultValues,
@@ -76,7 +67,6 @@ export function RecurringTransactionForm({
   categories,
   onSuccess,
 }: RecurringTransactionFormProps) {
-  const [isLoading, setIsLoading] = useState(false);
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
 
@@ -97,35 +87,12 @@ export function RecurringTransactionForm({
   const frequency = useWatch({ control: form.control, name: "frequency" });
   const startDate = useWatch({ control: form.control, name: "start_date" });
 
-  const onSubmit = async (data: RecurringFormValues) => {
-    setIsLoading(true);
-    try {
-      let result;
-
-      if (recurringId) {
-        result = await updateRecurringTransaction(recurringId, data);
-      } else {
-        result = await createRecurringTransaction(data);
-      }
-
-      if (result?.error) {
-        toast.error(result.error);
-        setIsLoading(false);
-        return;
-      }
-
-      toast.success(
-        recurringId
-          ? "Transação recorrente atualizada com sucesso!"
-          : "Transação recorrente criada com sucesso!"
-      );
-      form.reset();
-      onSuccess?.();
-    } catch (error) {
-      toast.error("Ocorreu um erro ao salvar a transação recorrente");
-      setIsLoading(false);
-    }
-  };
+  const { execute: onSubmit, isLoading } = useServerAction<RecurringFormValues>({
+    action: (data) => recurringId ? updateRecurringTransaction(recurringId, data) : createRecurringTransaction(data),
+    successMessage: recurringId ? "Transação recorrente atualizada com sucesso!" : "Transação recorrente criada com sucesso!",
+    errorMessage: "Ocorreu um erro ao salvar a transação recorrente",
+    onSuccess: () => { form.reset(); onSuccess?.(); },
+  });
 
   // Filtra categorias baseado no tipo selecionado (se necessário)
   const filteredCategories = categories;
@@ -233,7 +200,7 @@ export function RecurringTransactionForm({
                     inputMode="decimal"
                     placeholder="0,00"
                     className="pl-8"
-                    value={field.value ? formatCurrency(field.value) : ""}
+                    value={field.value ? formatCurrencyInput(field.value) : ""}
                     onChange={(e) => {
                       const inputValue = e.target.value;
                       const numbers = inputValue.replace(/\D/g, "");

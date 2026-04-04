@@ -15,6 +15,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { PieChart as PieIcon } from "lucide-react";
+import { ChartEmptyState } from "./chart-empty-state";
 
 type CategoryData = {
   name: string;
@@ -54,13 +55,11 @@ export function ChartExpensesByCategory({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex h-[300px] items-center justify-center">
-          <div className="flex flex-col items-center gap-2 text-center text-sm text-muted-foreground">
-            <PieIcon className="h-8 w-8 text-muted-foreground/70" />
-            <p>Ainda não há gastos categorizados para exibir neste gráfico.</p>
-            <p className="text-xs">
-              Cadastre transações com categorias para visualizar esta visão.
-            </p>
-          </div>
+          <ChartEmptyState
+            icon={PieIcon}
+            title="Ainda não há gastos categorizados para exibir neste gráfico."
+            description="Cadastre transações com categorias para visualizar esta visão."
+          />
         </CardContent>
       </Card>
     );

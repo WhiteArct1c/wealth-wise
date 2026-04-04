@@ -15,6 +15,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { PieChart as PieIcon } from "lucide-react";
+import { ChartEmptyState } from "./chart-empty-state";
 
 type TransactionStatusData = {
   name: string;
@@ -50,13 +51,11 @@ export function ChartTransactionStatus({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex h-[300px] items-center justify-center">
-          <div className="flex flex-col items-center gap-2 text-center text-sm text-muted-foreground">
-            <PieIcon className="h-8 w-8 text-muted-foreground/70" />
-            <p>Não há transações neste mês para exibir o status.</p>
-            <p className="text-xs">
-              Crie novas transações para acompanhar pendentes e pagas.
-            </p>
-          </div>
+          <ChartEmptyState
+            icon={PieIcon}
+            title="Não há transações neste mês para exibir o status."
+            description="Crie novas transações para acompanhar pendentes e pagas."
+          />
         </CardContent>
       </Card>
     );

@@ -23,20 +23,9 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { accountSchema, type AccountFormValues } from "@/lib/validations/account";
 import { Loader2, Wallet, Building2, PiggyBank } from "lucide-react";
-import { toast } from "sonner";
 import { createAccount, updateAccount } from "@/app/actions/accounts";
-import { useState } from "react";
-
-// Função para formatar valor como moeda brasileira
-// Recebe centavos (do formulário) e retorna string formatada
-const formatCurrency = (value: number): string => {
-  if (!value && value !== 0) return "";
-  // Converte centavos para reais para exibição
-  return new Intl.NumberFormat("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value / 100);
-};
+import { formatCurrencyInput } from "@/lib/utils";
+import { useServerAction } from "@/hooks/use-server-action";
 
 type AccountFormProps = {
   accountId?: string;
@@ -66,8 +55,6 @@ const accountTypes = [
 ] as const;
 
 export function AccountForm({ accountId, defaultValues, onSuccess }: AccountFormProps) {
-  const [isLoading, setIsLoading] = useState(false);
-
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
     defaultValues: {
@@ -78,33 +65,12 @@ export function AccountForm({ accountId, defaultValues, onSuccess }: AccountForm
     },
   });
 
-  const onSubmit = async (data: AccountFormValues) => {
-    setIsLoading(true);
-    try {
-      let result;
-      
-      if (accountId) {
-        result = await updateAccount(accountId, data);
-      } else {
-        result = await createAccount(data);
-      }
-
-      if (result?.error) {
-        toast.error(result.error);
-        setIsLoading(false);
-        return;
-      }
-
-      toast.success(
-        accountId ? "Conta atualizada com sucesso!" : "Conta criada com sucesso!"
-      );
-      form.reset();
-      onSuccess?.();
-    } catch {
-      toast.error("Ocorreu um erro ao salvar a conta");
-      setIsLoading(false);
-    }
-  };
+  const { execute: onSubmit, isLoading } = useServerAction<AccountFormValues>({
+    action: (data) => accountId ? updateAccount(accountId, data) : createAccount(data),
+    successMessage: accountId ? "Conta atualizada com sucesso!" : "Conta criada com sucesso!",
+    errorMessage: "Ocorreu um erro ao salvar a conta",
+    onSuccess: () => { form.reset(); onSuccess?.(); },
+  });
 
   return (
     <Form {...form}>
@@ -203,7 +169,7 @@ export function AccountForm({ accountId, defaultValues, onSuccess }: AccountForm
                     inputMode="decimal"
                     placeholder="0,00"
                     className="pl-8"
-                    value={field.value ? formatCurrency(field.value) : ""}
+                    value={field.value ? formatCurrencyInput(field.value) : ""}
                     onChange={(e) => {
                       const inputValue = e.target.value;
                       

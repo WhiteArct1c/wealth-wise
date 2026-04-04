@@ -12,10 +12,10 @@ import {
 } from "@/components/ui/dialog";
 import { GoalForm } from "./goal-form";
 import { GoalsTable } from "./goals-table";
-import type { Goal } from "@/contexts/goals-context";
+import type { Goal } from "@/contexts";
 import { Target } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useGoalsContext } from "@/contexts/goals-context";
+import { useGoalsContext } from "@/contexts";
 
 type GoalsPageClientProps = {
   goals: Goal[];

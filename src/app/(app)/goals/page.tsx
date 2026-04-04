@@ -8,13 +8,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Target, PiggyBank, CheckCircle2, CalendarDays } from "lucide-react";
-import { GoalsProvider } from "@/contexts/goals-context";
+import { GoalsProvider } from "@/contexts";
 import { GoalsPageClient } from "@/components/goals/goals-page-client";
 import { GoalsEditDialog } from "@/components/goals/goals-edit-dialog";
 import { TablePagination } from "@/components/shared/table-pagination";
 import { TableFilters } from "@/components/shared/table-filters";
 import { ItemsPerPageSelector } from "@/components/shared/items-per-page-selector";
-import { applySort, applySearchFilter } from "@/lib/table-utils";
+
 import { DEFAULT_ITEMS_PER_PAGE } from "@/constants/ui";
 
 export default async function GoalsPage({
@@ -79,22 +79,24 @@ export default async function GoalsPage({
   const sortColumn = params.sort || "created_at";
   const sortOrder = params.order || "desc";
   filteredGoals.sort((a, b) => {
-    let aVal: any = a[sortColumn as keyof typeof a];
-    let bVal: any = b[sortColumn as keyof typeof b];
-    
-    if (aVal === null || aVal === undefined) aVal = "";
-    if (bVal === null || bVal === undefined) bVal = "";
-    
-    if (typeof aVal === "string") {
-      aVal = aVal.toLowerCase();
-      bVal = bVal.toLowerCase();
+    const rawA = a[sortColumn as keyof typeof a];
+    const rawB = b[sortColumn as keyof typeof b];
+
+    const toComp = (v: unknown): string | number =>
+      typeof v === "string" || typeof v === "number" ? v : "";
+
+    const aComp = toComp(rawA);
+    const bComp = toComp(rawB);
+
+    if (typeof aComp === "number" && typeof bComp === "number") {
+      return sortOrder === "asc" ? aComp - bComp : bComp - aComp;
     }
-    
-    if (sortOrder === "asc") {
-      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-    } else {
-      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
-    }
+
+    const aStr = String(aComp).toLowerCase();
+    const bStr = String(bComp).toLowerCase();
+    return sortOrder === "asc"
+      ? aStr > bStr ? 1 : aStr < bStr ? -1 : 0
+      : aStr < bStr ? 1 : aStr > bStr ? -1 : 0;
   });
 
   // Aplicar paginação

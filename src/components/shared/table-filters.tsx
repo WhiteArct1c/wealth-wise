@@ -19,7 +19,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { X, Filter } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 type FilterOption = {
   value: string;
@@ -58,16 +58,17 @@ export function TableFilters({
     return values;
   });
 
-  // Atualiza valores quando searchParams mudam (ex: navegação do browser)
-  useEffect(() => {
+  // Sync state when searchParams change (e.g. browser back/forward navigation)
+  const [prevSearchParams, setPrevSearchParams] = useState(searchParams);
+  if (prevSearchParams !== searchParams) {
+    setPrevSearchParams(searchParams);
     setSearchValue(searchParams.get(searchKey) || "");
     const newSelectValues: Record<string, string> = {};
     selectFilters.forEach((filter) => {
-      const paramValue = searchParams.get(filter.key);
-      newSelectValues[filter.key] = paramValue || "";
+      newSelectValues[filter.key] = searchParams.get(filter.key) || "";
     });
     setSelectValues(newSelectValues);
-  }, [searchParams, searchKey, selectFilters]);
+  }
 
   const applyFilters = () => {
     const params = new URLSearchParams(searchParams.toString());
@@ -111,17 +112,11 @@ export function TableFilters({
     onFilterChange?.();
   };
 
-  const hasActiveFilters = searchValue.trim() || Object.values(selectValues).some((v) => v);
   const hasActiveSelectFilters = Object.values(selectValues).some((v) => v && v !== "__all__");
   const [isOpen, setIsOpen] = useState(false);
 
   const handleApplyFilters = () => {
     applyFilters();
-    setIsOpen(false);
-  };
-
-  const handleClearFilters = () => {
-    clearFilters();
     setIsOpen(false);
   };
 

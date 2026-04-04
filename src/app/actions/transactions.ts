@@ -1,46 +1,10 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { transactionSchema, type TransactionFormValues } from "@/lib/validations/transaction";
+import { transactionSchema, transactionObjectSchema, type TransactionFormValues } from "@/lib/validations/transaction";
 import { revalidatePath } from "next/cache";
-import type { Tables } from "@/lib/supabase/types";
-
-function getNextRunDate(
-  current: Date,
-  frequency: Tables<"recurring_transactions">["frequency"],
-  dayOfMonth?: number | null
-): Date {
-  const d = new Date(current);
-
-  switch (frequency) {
-    case "DAILY":
-      d.setDate(d.getDate() + 1);
-      break;
-    case "WEEKLY":
-      d.setDate(d.getDate() + 7);
-      break;
-    case "MONTHLY": {
-      const day = dayOfMonth ?? d.getDate();
-      d.setMonth(d.getMonth() + 1);
-      const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-      d.setDate(Math.min(day, lastDay));
-      break;
-    }
-    case "YEARLY": {
-      const day = dayOfMonth ?? d.getDate();
-      const month = d.getMonth();
-      d.setFullYear(d.getFullYear() + 1);
-      const lastDay = new Date(d.getFullYear(), month + 1, 0).getDate();
-      d.setMonth(month);
-      d.setDate(Math.min(day, lastDay));
-      break;
-    }
-    default:
-      break;
-  }
-
-  return d;
-}
+import { getNextRunDate } from "@/lib/date-utils";
+import { calculateAccountBalance } from "@/lib/calculations";
 
 export async function createTransaction(
   formData: TransactionFormValues,
@@ -97,34 +61,8 @@ export async function createTransaction(
     categoryType = category.type as "INCOME" | "EXPENSE";
   }
 
-  // Calcula saldo atual da conta (derivado) para evitar saldo negativo em despesas
-  const { data: accountWithBalance } = await supabase
-    .from("accounts")
-    .select("id, initial_balance")
-    .eq("id", validation.data.account_id)
-    .single();
-
-  if (!accountWithBalance) {
-    return {
-      error: "Conta não encontrada",
-    };
-  }
-
-  const { data: accountTx = [] } = await supabase
-    .from("transactions")
-    .select("amount, category:categories(type)")
-    .eq("user_id", user.id)
-    .eq("account_id", validation.data.account_id);
-
-  type TxRow = {
-    amount: number;
-    category: { type: "INCOME" | "EXPENSE" } | null;
-  };
-
-  const typedAccountTx = accountTx as unknown as TxRow[];
-
   // Se for recorrente com data futura, não cria transação inicial nem verifica saldo
-  const isRecurringWithFutureDate = validation.data.is_recurring && 
+  const isRecurringWithFutureDate = validation.data.is_recurring &&
     validation.data.recurring_start_date &&
     new Date(`${validation.data.recurring_start_date}T00:00:00`) > new Date();
 
@@ -135,20 +73,21 @@ export async function createTransaction(
 
   // Só verifica saldo se não for uma recorrência com data futura
   if (!isRecurringWithFutureDate) {
-    const netExisting = typedAccountTx.reduce((sum, tx) => {
-      const isExpense = tx.category?.type === "EXPENSE";
-      const delta = isExpense ? -tx.amount : tx.amount;
-      return sum + delta;
-    }, 0);
+    const currentBalance = await calculateAccountBalance(
+      supabase,
+      user.id,
+      validation.data.account_id
+    );
 
-    const currentBalanceBefore =
-      (accountWithBalance.initial_balance || 0) + netExisting;
+    if (currentBalance === null) {
+      return { error: "Conta não encontrada" };
+    }
 
     const newAmountReais = validation.data.amount / 100;
     const isNewExpense = categoryType === "EXPENSE";
     const newDelta = isNewExpense ? -newAmountReais : newAmountReais;
 
-    if (currentBalanceBefore + newDelta < 0) {
+    if (currentBalance + newDelta < 0) {
       return {
         error: "Saldo insuficiente na conta para esta despesa",
       };
@@ -241,6 +180,14 @@ export async function createTransaction(
 }
 
 export async function updateTransaction(id: string, formData: Partial<TransactionFormValues>) {
+  const partialValidation = transactionObjectSchema.partial().safeParse(formData);
+  if (!partialValidation.success) {
+    return {
+      error: "Dados inválidos",
+      details: partialValidation.error.issues,
+    };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -290,6 +237,7 @@ export async function updateTransaction(id: string, formData: Partial<Transactio
   }
 
   revalidatePath("/transactions");
+  revalidatePath("/dashboard");
   return {
     success: true,
     data,

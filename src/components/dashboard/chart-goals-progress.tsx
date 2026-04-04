@@ -15,6 +15,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { Target } from "lucide-react";
+import { ChartEmptyState } from "./chart-empty-state";
 
 type GoalData = {
   name: string;
@@ -49,13 +50,11 @@ export function ChartGoalsProgress({ data }: ChartGoalsProgressProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex h-[300px] items-center justify-center">
-          <div className="flex flex-col items-center gap-2 text-center text-sm text-muted-foreground">
-            <Target className="h-8 w-8 text-muted-foreground/70" />
-            <p>Nenhuma meta cadastrada ainda.</p>
-            <p className="text-xs">
-              Crie metas na tela de Metas para acompanhar seu progresso aqui.
-            </p>
-          </div>
+          <ChartEmptyState
+            icon={Target}
+            title="Nenhuma meta cadastrada ainda."
+            description="Crie metas na tela de Metas para acompanhar seu progresso aqui."
+          />
         </CardContent>
       </Card>
     );

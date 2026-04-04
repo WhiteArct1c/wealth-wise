@@ -34,16 +34,9 @@ import { deleteCategory } from "@/app/actions/categories";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { TableSortHeader } from "@/components/shared/table-sort-header";
+import type { Category } from "@/lib/types/category";
 
-export type Category = {
-  id: string;
-  name: string;
-  type: "INCOME" | "EXPENSE";
-  budget_type: "ESSENTIAL_FIXED" | "ESSENTIAL_VARIABLE" | "DISCRETIONARY" | null;
-  color_hex: string | null;
-  icon_slug: string | null;
-  created_at: string;
-};
+export type { Category };
 
 type CategoriesTableProps = {
   categories: Category[];
