@@ -9,7 +9,7 @@ const withBundleAnalyzer = bundleAnalyzer({
 const nextConfig: NextConfig = {
   // Temporarily disabled to avoid Turbopack issues
   reactCompiler: true,
-  // Habilita modo standalone para Docker
+  // Enables standalone output for Docker
   output: "standalone",
 };
 
