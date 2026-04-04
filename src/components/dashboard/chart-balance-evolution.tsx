@@ -15,6 +15,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { TrendingUp } from "lucide-react";
+import { ChartEmptyState } from "./chart-empty-state";
 
 type BalanceEvolutionData = {
   month: string;
@@ -47,13 +48,11 @@ export function ChartBalanceEvolution({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex h-[300px] items-center justify-center">
-          <div className="flex flex-col items-center gap-2 text-center text-sm text-muted-foreground">
-            <TrendingUp className="h-8 w-8 text-muted-foreground/70" />
-            <p>Ainda não há movimentações suficientes para exibir o saldo.</p>
-            <p className="text-xs">
-              Registre transações para acompanhar a evolução do seu saldo.
-            </p>
-          </div>
+          <ChartEmptyState
+            icon={TrendingUp}
+            title="Ainda não há movimentações suficientes para exibir o saldo."
+            description="Registre transações para acompanhar a evolução do seu saldo."
+          />
         </CardContent>
       </Card>
     );
