@@ -180,53 +180,95 @@ jobs:
       - name: Generate comparison
         run: |
           python3 - <<'PYEOF'
-          import json
+          import json, os
 
           def fmt(n):
               if n < 1024: return f"{n} B"
-              if n < 1024*1024: return f"{n/1024:.1f} KB"
-              return f"{n/1024/1024:.2f} MB"
+              if n < 1024 * 1024: return f"{n / 1024:.1f} KB"
+              return f"{n / 1024 / 1024:.2f} MB"
 
-          def icon(d):
-              if d > 1024: return "▲"
-              if d < -1024: return "▼"
-              return "~"
+          def diff_cell(d):
+              if d == 0:       return "➖ sem alteração"
+              if d > 51_200:   return f"🔴 +{fmt(d)}"   # >50KB aumento grave
+              if d > 10_240:   return f"🟠 +{fmt(d)}"   # >10KB aumento moderado
+              if d > 1_024:    return f"🟡 +{fmt(d)}"   # >1KB aumento leve
+              if d > 0:        return f"🔵 +{fmt(d)}"   # <1KB ruído
+              return              f"🟢 -{fmt(abs(d))}"  # redução
 
-          with open("bundle-stats-pr.json") as f: pr = json.load(f)
+          def total_badge(d):
+              if d == 0:     return "➖ Sem alteração"
+              if d > 51_200: return f"🔴 +{fmt(d)} — aumento significativo"
+              if d > 10_240: return f"🟠 +{fmt(d)} — aumento moderado"
+              if d > 1_024:  return f"🟡 +{fmt(d)} — aumento leve"
+              if d > 0:      return f"🔵 +{fmt(d)} — ruído"
+              return              f"🟢 -{fmt(abs(d))} — redução de bundle"
+
+          with open("bundle-stats-pr.json") as f:   pr   = json.load(f)
           with open("bundle-stats-main.json") as f: main = json.load(f)
 
-          lines = ["## Bundle Size Analysis", ""]
-          lines += ["### Pages", "| Route | Main | PR Branch | Diff |", "|---|---|---|---|"]
-
-          pr_pages = pr.get("pages", {})
+          pr_pages   = pr.get("pages", {})
           main_pages = main.get("pages", {})
+          pr_total   = sum(pr.get("chunks", {}).values())
+          main_total = sum(main.get("chunks", {}).values())
+          total_diff = pr_total - main_total
+
+          lines = [
+              "## 📦 Bundle Size Analysis",
+              "",
+              f"> **Total de chunks:** {total_badge(total_diff)} &nbsp;·&nbsp; "
+              f"main `{fmt(main_total)}` → PR `{fmt(pr_total)}`",
+              "",
+              "---",
+              "",
+              "### 🗂️ Páginas",
+              "| Rota | Main | Esta PR | Diff |",
+              "|:-----|-----:|-------:|:-----|",
+          ]
 
           for page in sorted(set(list(pr_pages) + list(main_pages))):
-              ms = main_pages.get(page, 0)
-              ps = pr_pages.get(page, 0)
-              d = ps - ms
-              note = " *(nova)*" if page not in main_pages else (" *(removida)*" if page not in pr_pages else "")
-              diff_str = f"{icon(d)} {fmt(abs(d))}" if d != 0 else "sem alteração"
-              lines.append(f"| `{page}`{note} | {fmt(ms)} | {fmt(ps)} | {diff_str} |")
-
-          pr_total = sum(pr.get("chunks", {}).values())
-          main_total = sum(main.get("chunks", {}).values())
-          d = pr_total - main_total
+              ms   = main_pages.get(page, 0)
+              ps   = pr_pages.get(page, 0)
+              d    = ps - ms
+              tag  = " `✨ nova`"      if page not in main_pages  else \
+                     " `🗑️ removida`" if page not in pr_pages     else ""
+              lines.append(f"| `{page}`{tag} | {fmt(ms)} | {fmt(ps)} | {diff_cell(d)} |")
 
           lines += [
               "",
-              "### Chunks Compartilhados",
-              f"- **Main**: {fmt(main_total)}",
-              f"- **PR**: {fmt(pr_total)}",
-              f"- **Diferença**: {icon(d)} {fmt(abs(d))}",
+              "---",
               "",
-              "*Tamanhos sem compressão. Gzip reduz ~70% no tamanho entregue.*",
+              "### 🧩 Chunks Compartilhados",
+              f"| | Tamanho |",
+              f"|:---|---:|",
+              f"| **main** | {fmt(main_total)} |",
+              f"| **esta PR** | {fmt(pr_total)} |",
+              f"| **diferença** | {diff_cell(total_diff)} |",
               "",
-              "> Informativo — não bloqueia merge.",
+              "---",
+              "",
+              "<details>",
+              "<summary>ℹ️ Como interpretar</summary>",
+              "",
+              "| Ícone | Significado |",
+              "|:---:|:---|",
+              "| 🔴 | Aumento > 50 KB — revisar |",
+              "| 🟠 | Aumento > 10 KB — atenção |",
+              "| 🟡 | Aumento > 1 KB — leve |",
+              "| 🔵 | Variação < 1 KB — ruído de build |",
+              "| 🟢 | Bundle reduziu |",
+              "| ➖ | Sem alteração |",
+              "",
+              "_Tamanhos sem compressão. Gzip reduz ~70% no tamanho entregue._",
+              "",
+              "</details>",
+              "",
+              "<!-- bundle-analysis -->",
           ]
 
           with open("comment.md", "w") as f:
               f.write("\n".join(lines))
+
+          print("Comment gerado com sucesso.")
           PYEOF
 
       - name: Post comment
@@ -237,7 +279,7 @@ jobs:
           REPO=${{ github.repository }}
 
           EXISTING=$(gh api repos/$REPO/issues/$PR/comments \
-            --jq '.[] | select(.body | startswith("## Bundle Size Analysis")) | .id' \
+            --jq '.[] | select(.body | contains("<!-- bundle-analysis -->")) | .id' \
             | head -1)
 
           [ -n "$EXISTING" ] && gh api repos/$REPO/issues/comments/$EXISTING -X DELETE
