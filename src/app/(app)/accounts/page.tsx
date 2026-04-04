@@ -8,7 +8,7 @@ import { AccountsEditDialog } from "@/components/accounts/accounts-edit-dialog";
 import { TablePagination } from "@/components/shared/table-pagination";
 import { TableFilters } from "@/components/shared/table-filters";
 import { ItemsPerPageSelector } from "@/components/shared/items-per-page-selector";
-import { applySort, applySearchFilter, type SortConfig } from "@/lib/table-utils";
+
 import { DEFAULT_ITEMS_PER_PAGE } from "@/constants/ui";
 
 export default async function AccountsPage({
@@ -38,31 +38,8 @@ export default async function AccountsPage({
     redirect("/login");
   }
 
-  // Query base
-  let accountsQuery = supabase
-    .from("accounts")
-    .select("*", { count: "exact" })
-    .eq("user_id", user.id);
-
-  // Aplicar busca
-  if (params.search) {
-    accountsQuery = applySearchFilter(accountsQuery, params.search, "name");
-  }
-
-  // Aplicar filtros
-  if (params.type) {
-    accountsQuery = accountsQuery.eq("type", params.type);
-  }
-  if (params.status) {
-    if (params.status === "active") {
-      accountsQuery = accountsQuery.eq("is_active", true);
-    } else if (params.status === "inactive") {
-      accountsQuery = accountsQuery.eq("is_active", false);
-    }
-  }
-
   // Buscar todas as contas primeiro (para calcular saldo e ordenar)
-  const { data: allAccounts, error, count } = await supabase
+  const { data: allAccounts, error } = await supabase
     .from("accounts")
     .select("*")
     .eq("user_id", user.id);
@@ -72,7 +49,6 @@ export default async function AccountsPage({
   }
 
   const allAccountsData = allAccounts || [];
-  const totalAccounts = count || 0;
 
   // Buscar transações por conta para calcular saldo atual (derivado)
   const { data: accountTransactions = [] } = await supabase
@@ -130,8 +106,9 @@ export default async function AccountsPage({
   const sortColumn = params.sort || "created_at";
   const sortOrder = params.order || "desc";
   accountsWithBalance.sort((a, b) => {
-    let aVal: any = a[sortColumn as keyof typeof a];
-    let bVal: any = b[sortColumn as keyof typeof b];
+    type SortValue = string | number | boolean | null | undefined;
+    let aVal: SortValue = a[sortColumn as keyof typeof a] as SortValue;
+    let bVal: SortValue = b[sortColumn as keyof typeof b] as SortValue;
     
     // Tratamento especial para current_balance
     if (sortColumn === "initial_balance" || sortColumn === "current_balance") {
@@ -284,7 +261,7 @@ export default async function AccountsPage({
             ]}
           />
           
-          <AccountsPageClient accounts={accountsWithBalance} showTable />
+          <AccountsPageClient accounts={accountsData} showTable />
           
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <ItemsPerPageSelector />
