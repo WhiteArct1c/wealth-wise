@@ -34,7 +34,7 @@ export async function signIn(formData: unknown) {
       };
     }
     return {
-      error: error.message,
+      error: error.message || "Ocorreu um erro inesperado.",
     };
   }
 
@@ -72,7 +72,7 @@ export async function signUp(formData: unknown) {
       };
     }
     return {
-      error: error.message,
+      error: error.message || "Erro ao criar conta. Tente novamente.",
     };
   }
 
@@ -129,7 +129,7 @@ export async function verifyOtp(formData: unknown) {
       };
     }
     return {
-      error: error.message,
+      error: error.message || "Ocorreu um erro inesperado.",
     };
   }
 
@@ -153,7 +153,7 @@ export async function resendOtp(email: string) {
 
   if (error) {
     return {
-      error: error.message,
+      error: error.message || "Ocorreu um erro inesperado.",
     };
   }
 
