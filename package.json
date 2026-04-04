@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "lint:fix": "eslint --fix"
+    "lint:fix": "eslint --fix",
+    "supabase:types": "supabase gen types typescript --local > src/lib/supabase/types.ts",
+    "supabase:reset": "supabase db reset",
+    "supabase:status": "supabase status"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
