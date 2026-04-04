@@ -1,0 +1,220 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  compute-version:
+    name: Compute Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.semver.outputs.version }}
+      tag: ${{ steps.semver.outputs.tag }}
+      changelog: ${{ steps.semver.outputs.changelog }}
+      skip: ${{ steps.semver.outputs.skip }}
+    steps:
+      - name: Checkout with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute semver from conventional commits
+        id: semver
+        run: |
+          # -----------------------------------------------------------------------
+          # Conventional Commits → Semver:
+          #   BREAKING CHANGE / type!:  →  MAJOR
+          #   feat:                     →  MINOR
+          #   fix: / chore: / demais    →  PATCH
+          # -----------------------------------------------------------------------
+
+          git fetch --tags --force
+
+          LAST_TAG=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' \
+            --sort=-version:refname | head -1)
+
+          if [ -z "$LAST_TAG" ]; then
+            LAST_TAG="v0.0.0"
+            LAST_TAG_SHA=""
+          else
+            LAST_TAG_SHA=$(git rev-list -n 1 "$LAST_TAG")
+          fi
+
+          echo "Última tag: $LAST_TAG"
+
+          if [ -z "$LAST_TAG_SHA" ]; then
+            COMMITS=$(git log --format="%s%n%b" HEAD)
+          else
+            COMMITS=$(git log --format="%s%n%b" "${LAST_TAG_SHA}..HEAD")
+          fi
+
+          if [ -z "$COMMITS" ]; then
+            echo "Nenhum commit desde a última tag — pulando release"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BUMP="patch"
+          if echo "$COMMITS" | grep -qE "BREAKING[[:space:]]CHANGE:|^[a-z]+(\(.+\))?!:"; then
+            BUMP="major"
+          elif echo "$COMMITS" | grep -qE "^feat(\(.+\))?:"; then
+            BUMP="minor"
+          fi
+
+          echo "Bump: $BUMP"
+
+          VERSION="${LAST_TAG#v}"
+          MAJOR=$(echo "$VERSION" | cut -d. -f1)
+          MINOR=$(echo "$VERSION" | cut -d. -f2)
+          PATCH=$(echo "$VERSION" | cut -d. -f3)
+
+          case $BUMP in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+          esac
+
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          NEW_TAG="v${NEW_VERSION}"
+          echo "Nova versão: $NEW_TAG"
+
+          build_section() {
+            local label="$1" pattern="$2"
+            local entries
+            if [ -z "$LAST_TAG_SHA" ]; then
+              entries=$(git log --format="%s" HEAD | grep -E "^${pattern}" || true)
+            else
+              entries=$(git log --format="%s" "${LAST_TAG_SHA}..HEAD" | grep -E "^${pattern}" || true)
+            fi
+            if [ -n "$entries" ]; then
+              printf "### %s\n" "$label"
+              echo "$entries" | while IFS= read -r line; do
+                printf "- %s\n" "$line"
+              done
+              echo ""
+            fi
+          }
+
+          BREAKING=$(build_section "Breaking Changes" "[a-z]+(\(.+\))?!:")
+          FEATURES=$(build_section "Features" "feat(\(.+\))?:")
+          FIXES=$(build_section "Bug Fixes" "fix(\(.+\))?:")
+          MAINT=$(build_section "Manutenção" "chore(\(.+\))?:|refactor(\(.+\))?:|perf(\(.+\))?:")
+
+          CHANGELOG="${BREAKING}${FEATURES}${FIXES}${MAINT}"
+          [ -z "$CHANGELOG" ] && CHANGELOG="Sem mudanças significativas."
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "changelog<<CHANGELOG_EOF"
+            echo "$CHANGELOG"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+  build-and-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: compute-version
+    if: needs.compute-version.outputs.skip != 'true'
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/whitearct1c/wealth-wise
+          tags: |
+            type=raw,value=${{ needs.compute-version.outputs.version }}
+            type=raw,value=latest
+
+      - name: Build e push multi-arch
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
+
+  create-tag-and-release:
+    name: Tag & GitHub Release
+    runs-on: ubuntu-latest
+    needs: [compute-version, build-and-push]
+    if: needs.compute-version.outputs.skip != 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Criar e push git tag
+        env:
+          TAG: ${{ needs.compute-version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Criar GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.compute-version.outputs.tag }}
+          VERSION: ${{ needs.compute-version.outputs.version }}
+          CHANGELOG: ${{ needs.compute-version.outputs.changelog }}
+          IMAGE_DIGEST: ${{ needs.build-and-push.outputs.image-digest }}
+        run: |
+          BODY="## O que mudou
+
+          ${CHANGELOG}
+
+          ## Imagem Docker
+
+          \`\`\`
+          docker pull ghcr.io/whitearct1c/wealth-wise:${VERSION}
+          \`\`\`
+
+          **Digest**: \`${IMAGE_DIGEST}\`
+          **Plataformas**: linux/amd64, linux/arm64"
+
+          gh release create "$TAG" \
+            --title "Release ${TAG}" \
+            --notes "$BODY" \
+            --repo "${{ github.repository }}"
