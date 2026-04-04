@@ -24,9 +24,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, Target } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { toast } from "sonner";
 import { createGoal, updateGoal } from "@/app/actions/goals";
 import { formatCurrencyInput } from "@/lib/utils";
+import { useServerAction } from "@/hooks/use-server-action";
 
 type GoalFormProps = {
   goalId?: string;
@@ -35,7 +35,6 @@ type GoalFormProps = {
 };
 
 export function GoalForm({ goalId, defaultValues, onSuccess }: GoalFormProps) {
-  const [isLoading, setIsLoading] = useState(false);
   const [deadlineOpen, setDeadlineOpen] = useState(false);
 
   const form = useForm<GoalFormValues>({
@@ -48,33 +47,12 @@ export function GoalForm({ goalId, defaultValues, onSuccess }: GoalFormProps) {
     },
   });
 
-  const onSubmit = async (data: GoalFormValues) => {
-    setIsLoading(true);
-    try {
-      let result;
-
-      if (goalId) {
-        result = await updateGoal(goalId, data);
-      } else {
-        result = await createGoal(data);
-      }
-
-      if (result?.error) {
-        toast.error(result.error);
-        setIsLoading(false);
-        return;
-      }
-
-      toast.success(
-        goalId ? "Meta atualizada com sucesso!" : "Meta criada com sucesso!"
-      );
-      form.reset();
-      onSuccess?.();
-    } catch {
-      toast.error("Ocorreu um erro ao salvar a meta");
-      setIsLoading(false);
-    }
-  };
+  const { execute: onSubmit, isLoading } = useServerAction<GoalFormValues>({
+    action: (data) => goalId ? updateGoal(goalId, data) : createGoal(data),
+    successMessage: goalId ? "Meta atualizada com sucesso!" : "Meta criada com sucesso!",
+    errorMessage: "Ocorreu um erro ao salvar a meta",
+    onSuccess: () => { form.reset(); onSuccess?.(); },
+  });
 
   return (
     <Form {...form}>
