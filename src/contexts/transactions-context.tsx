@@ -1,6 +1,6 @@
 "use client";
 
-import type { Transaction } from "@/components/transactions/transactions-table";
+import type { Transaction } from "@/lib/types/transaction";
 import { createEditDialogContext } from "./create-edit-dialog-context";
 
 const { Provider, useEditDialogContext } = createEditDialogContext<Transaction>();

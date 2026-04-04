@@ -62,5 +62,3 @@ export type DashboardOverviewData = {
   budgetByType: BudgetTypePoint[];
   goals: GoalProgressPoint[];
 };
-
-

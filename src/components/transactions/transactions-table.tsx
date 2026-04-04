@@ -38,22 +38,9 @@ import { ptBR } from "date-fns/locale";
 import { cn, parseLocalDate, formatCurrency } from "@/lib/utils";
 import { TRANSACTION_STATUS_LABEL } from "@/constants/status";
 import { TableSortHeader } from "@/components/shared/table-sort-header";
+import type { Transaction } from "@/lib/types/transaction";
 
-export type Transaction = {
-  id: string;
-  account_id: string;
-  category_id: string | null;
-  description: string;
-  amount: number; // Em reais do banco
-  date: string;
-  payment_date: string | null;
-  status: "PENDING" | "PAID" | null;
-  created_at: string;
-  recurring_id: string | null;
-  // Relacionamentos (opcional, pode vir do join)
-  account?: { name: string } | null;
-  category?: { name: string; type: "INCOME" | "EXPENSE"; color_hex: string | null } | null;
-};
+export type { Transaction };
 
 type TransactionsTableProps = {
   transactions: Transaction[];

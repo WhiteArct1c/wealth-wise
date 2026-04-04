@@ -11,7 +11,7 @@ import type {
   ExpensesByCategoryPoint,
   BudgetTypePoint,
   GoalProgressPoint,
-} from "@/@types/dashboard";
+} from "@/lib/types/dashboard";
 import { TRANSACTION_STATUS_LABEL } from "@/constants/status";
 import { processDueRecurringTransactions } from "@/app/actions/recurring-transactions";
 
