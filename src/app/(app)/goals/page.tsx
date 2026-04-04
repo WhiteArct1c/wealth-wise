@@ -14,7 +14,7 @@ import { GoalsEditDialog } from "@/components/goals/goals-edit-dialog";
 import { TablePagination } from "@/components/shared/table-pagination";
 import { TableFilters } from "@/components/shared/table-filters";
 import { ItemsPerPageSelector } from "@/components/shared/items-per-page-selector";
-import { applySort, applySearchFilter } from "@/lib/table-utils";
+
 import { DEFAULT_ITEMS_PER_PAGE } from "@/constants/ui";
 
 export default async function GoalsPage({
@@ -79,8 +79,9 @@ export default async function GoalsPage({
   const sortColumn = params.sort || "created_at";
   const sortOrder = params.order || "desc";
   filteredGoals.sort((a, b) => {
-    let aVal: any = a[sortColumn as keyof typeof a];
-    let bVal: any = b[sortColumn as keyof typeof b];
+    type SortValue = string | number | boolean | null | undefined;
+    let aVal: SortValue = a[sortColumn as keyof typeof a] as SortValue;
+    let bVal: SortValue = b[sortColumn as keyof typeof b] as SortValue;
     
     if (aVal === null || aVal === undefined) aVal = "";
     if (bVal === null || bVal === undefined) bVal = "";
