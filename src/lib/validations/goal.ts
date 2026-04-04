@@ -15,6 +15,7 @@ export const goalSchema = z.object({
     .min(0, "Valor acumulado não pode ser negativo"),
   deadline: z
     .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Data deve estar no formato AAAA-MM-DD")
     .nullable()
     .optional(),
 });
