@@ -107,7 +107,7 @@ jobs:
           fi
 
       - name: Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: ${{ steps.target.outputs.image }}
           format: sarif
