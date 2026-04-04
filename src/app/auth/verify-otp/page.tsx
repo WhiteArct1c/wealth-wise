@@ -1,5 +1,5 @@
 import { VerifyOtpForm } from "@/components/auth/verify-otp-form";
-import DarkVeil from "@/components/DarkVeil";
+import DarkVeil from "@/components/shared/dark-veil";
 import { AppLogo } from "@/components/shared/app-logo";
 
 export default async function VerifyOtpPage({

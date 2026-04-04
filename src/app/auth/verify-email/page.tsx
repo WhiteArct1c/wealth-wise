@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Mail, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import DarkVeil from "@/components/DarkVeil";
+import DarkVeil from "@/components/shared/dark-veil";
 
 type SearchParams = {
   email?: string;
