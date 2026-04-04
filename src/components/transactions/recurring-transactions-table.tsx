@@ -73,8 +73,6 @@ const frequencyLabels: Record<RecurringTransaction["frequency"], string> = {
 
 export function RecurringTransactionsTable({
   recurringTransactions,
-  accounts,
-  categories,
   onEdit,
 }: RecurringTransactionsTableProps) {
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
