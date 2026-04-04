@@ -92,8 +92,9 @@ export default async function TransactionsPage({
   const sortColumn = params.sort || "date";
   const sortOrder = params.order || "desc";
   filteredTransactions.sort((a, b) => {
-    let aVal: any = a[sortColumn as keyof typeof a];
-    let bVal: any = b[sortColumn as keyof typeof b];
+    type SortValue = string | number | boolean | null | undefined;
+    let aVal: SortValue = a[sortColumn as keyof typeof a] as SortValue;
+    let bVal: SortValue = b[sortColumn as keyof typeof b] as SortValue;
     
     // Tratamento especial para relacionamentos
     if (sortColumn === "account") {
@@ -192,8 +193,9 @@ export default async function TransactionsPage({
   const recurringSort = params.recurringSort || "next_run_date";
   const recurringOrder = params.recurringOrder || "asc";
   filteredRecurring.sort((a, b) => {
-    let aVal: any = a[recurringSort as keyof typeof a];
-    let bVal: any = b[recurringSort as keyof typeof b];
+    type SortValue = string | number | boolean | null | undefined;
+    let aVal: SortValue = a[recurringSort as keyof typeof a] as SortValue;
+    let bVal: SortValue = b[recurringSort as keyof typeof b] as SortValue;
     
     // Tratamento especial para relacionamentos
     if (recurringSort === "account") {
