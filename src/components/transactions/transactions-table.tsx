@@ -35,25 +35,12 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { cn, parseLocalDate } from "@/lib/utils";
+import { cn, parseLocalDate, formatCurrency } from "@/lib/utils";
 import { TRANSACTION_STATUS_LABEL } from "@/constants/status";
 import { TableSortHeader } from "@/components/shared/table-sort-header";
+import type { Transaction } from "@/lib/types/transaction";
 
-export type Transaction = {
-  id: string;
-  account_id: string;
-  category_id: string | null;
-  description: string;
-  amount: number; // Em reais do banco
-  date: string;
-  payment_date: string | null;
-  status: "PENDING" | "PAID" | null;
-  created_at: string;
-  recurring_id: string | null;
-  // Relacionamentos (opcional, pode vir do join)
-  account?: { name: string } | null;
-  category?: { name: string; type: "INCOME" | "EXPENSE"; color_hex: string | null } | null;
-};
+export type { Transaction };
 
 type TransactionsTableProps = {
   transactions: Transaction[];
@@ -64,14 +51,6 @@ export function TransactionsTable({ transactions, onEdit }: TransactionsTablePro
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const router = useRouter();
-
-  const formatCurrency = (value: number) => {
-    // value já vem em reais do banco
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value);
-  };
 
   const formatDate = (dateString: string) => {
     return format(parseLocalDate(dateString), "dd/MM/yyyy", { locale: ptBR });

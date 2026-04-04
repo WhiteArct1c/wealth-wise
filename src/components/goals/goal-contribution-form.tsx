@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,9 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { toast } from "sonner";
 import { contributeToGoal } from "@/app/actions/goals";
 import type { Tables } from "@/lib/supabase/types";
+import { formatCurrencyInput } from "@/lib/utils";
+import { useServerAction } from "@/hooks/use-server-action";
 
 const contributionSchema = z.object({
   account_id: z.string().min(1, "Conta é obrigatória"),
@@ -42,21 +42,11 @@ type GoalContributionFormProps = {
   onSuccess?: () => void;
 };
 
-const formatCurrency = (value: number): string => {
-  if (!value && value !== 0) return "";
-  return new Intl.NumberFormat("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value / 100);
-};
-
 export function GoalContributionForm({
   goalId,
   accounts,
   onSuccess,
 }: GoalContributionFormProps) {
-  const [isLoading, setIsLoading] = useState(false);
-
   const form = useForm<ContributionFormValues>({
     resolver: zodResolver(contributionSchema),
     defaultValues: {
@@ -65,31 +55,20 @@ export function GoalContributionForm({
     },
   });
 
-  const onSubmit = async (data: ContributionFormValues) => {
-    setIsLoading(true);
-    try {
-      const today = new Date().toISOString().slice(0, 10);
-
-      const result = await contributeToGoal({
+  const { execute, isLoading } = useServerAction<ContributionFormValues>({
+    action: (data) =>
+      contributeToGoal({
         goal_id: goalId,
         account_id: data.account_id,
         amount: data.amount,
-        date: today,
-      });
+        date: new Date().toISOString().slice(0, 10),
+      }),
+    successMessage: "Aporte realizado com sucesso!",
+    errorMessage: "Ocorreu um erro ao realizar o aporte",
+    onSuccess: () => onSuccess?.(),
+  });
 
-      if (result?.error) {
-        toast.error(result.error);
-        setIsLoading(false);
-        return;
-      }
-
-      toast.success("Aporte realizado com sucesso!");
-      onSuccess?.();
-    } catch {
-      toast.error("Ocorreu um erro ao realizar o aporte");
-      setIsLoading(false);
-    }
-  };
+  const onSubmit = (data: ContributionFormValues) => execute(data);
 
   return (
     <Form {...form}>
@@ -142,7 +121,7 @@ export function GoalContributionForm({
                     inputMode="decimal"
                     placeholder="0,00"
                     className="pl-8"
-                    value={field.value ? formatCurrency(field.value) : ""}
+                    value={field.value ? formatCurrencyInput(field.value) : ""}
                     onChange={(e) => {
                       const inputValue = e.target.value;
                       const numbers = inputValue.replace(/\D/g, "");

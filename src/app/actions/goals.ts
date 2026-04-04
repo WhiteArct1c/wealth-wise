@@ -7,6 +7,7 @@ import {
 } from "@/lib/validations/goal";
 import { revalidatePath } from "next/cache";
 import { transactionSchema } from "@/lib/validations/transaction";
+import { calculateAccountBalance } from "@/lib/calculations";
 
 export async function createGoal(formData: GoalFormValues) {
   const validation = goalSchema.safeParse(formData);
@@ -60,6 +61,14 @@ export async function updateGoal(
   id: string,
   formData: Partial<GoalFormValues>
 ) {
+  const partialValidation = goalSchema.partial().safeParse(formData);
+  if (!partialValidation.success) {
+    return {
+      error: "Dados inválidos",
+      details: partialValidation.error.issues,
+    };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -103,6 +112,7 @@ export async function updateGoal(
       target_amount: updateData.target_amount,
       current_amount: updateData.current_amount,
       deadline: updateData.deadline ?? null,
+      updated_at: new Date().toISOString(),
     })
     .eq("id", id)
     .select()
@@ -171,6 +181,19 @@ type ContributeToGoalInput = {
   date: string;
 };
 
+/**
+ * Creates a contribution (aporte) to a financial goal.
+ *
+ * Internally this:
+ * 1. Finds or auto-creates an "Aporte para metas" EXPENSE category.
+ * 2. Creates a debit transaction on the source account (amount in centavos → reais).
+ * 3. Adds the contribution amount to `goal.current_amount` (stored in reais).
+ *
+ * The description of the generated transaction is `"Aporte na meta <goalName>"`.
+ * Deleting that transaction (in `deleteTransaction`) reverses the goal amount.
+ *
+ * @param input.amount - Contribution amount **in centavos** (integer)
+ */
 export async function contributeToGoal(input: ContributeToGoalInput) {
   const supabase = await createClient();
   const {
@@ -271,44 +294,32 @@ export async function contributeToGoal(input: ContributeToGoalInput) {
     };
   }
 
-  const { data: account } = await supabase
+  const { data: accountOwner } = await supabase
     .from("accounts")
-    .select("user_id, initial_balance")
+    .select("user_id")
     .eq("id", input.account_id)
     .single();
 
-  if (!account || account.user_id !== txUser.id) {
+  if (!accountOwner || accountOwner.user_id !== txUser.id) {
     return {
       error: "Conta não encontrada ou sem permissão",
     };
   }
 
-  const { data: accountTx = [] } = await supabase
-    .from("transactions")
-    .select("amount, category:categories(type)")
-    .eq("user_id", txUser.id)
-    .eq("account_id", input.account_id);
+  const currentBalance = await calculateAccountBalance(
+    supabase,
+    txUser.id,
+    input.account_id
+  );
 
-  type TxRow = {
-    amount: number;
-    category: { type: "INCOME" | "EXPENSE" } | null;
-  };
-
-  const typedAccountTx = accountTx as unknown as TxRow[];
-
-  const netExisting = typedAccountTx.reduce((sum, tx) => {
-    const isExpense = tx.category?.type === "EXPENSE";
-    const delta = isExpense ? -tx.amount : tx.amount;
-    return sum + delta;
-  }, 0);
-
-  const currentBalanceBefore =
-    (account.initial_balance || 0) + netExisting;
+  if (currentBalance === null) {
+    return { error: "Conta não encontrada" };
+  }
 
   const newAmountReais = input.amount / 100;
   const newDelta = -newAmountReais; // aporte é sempre despesa na conta
 
-  if (currentBalanceBefore + newDelta < 0) {
+  if (currentBalance + newDelta < 0) {
     return {
       error: "Saldo insuficiente na conta para este aporte",
     };

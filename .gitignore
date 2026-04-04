@@ -43,3 +43,9 @@ next-env.d.ts
 # cursor
 .cursor/
 .cursor/*
+
+CLAUDE.md
+
+# supabase CLI metadata
+supabase/.branches
+supabase/.temp

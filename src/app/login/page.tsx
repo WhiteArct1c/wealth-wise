@@ -1,5 +1,5 @@
 import { LoginForm } from "@/components/auth/login-form";
-import DarkVeil from "@/components/DarkVeil";
+import DarkVeil from "@/components/shared/dark-veil";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 

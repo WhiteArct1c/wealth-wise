@@ -15,6 +15,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { PieChart as PieIcon } from "lucide-react";
+import { ChartEmptyState } from "./chart-empty-state";
 
 type BudgetTypeData = {
   name: string;
@@ -49,17 +50,11 @@ export function ChartBudgetType({ data }: ChartBudgetTypeProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex h-[300px] items-center justify-center">
-          <div className="flex flex-col items-center gap-2 text-center text-sm text-muted-foreground">
-            <PieIcon className="h-8 w-8 text-muted-foreground/70" />
-            <p>
-              Ainda não há gastos com tipos de orçamento configurados para
-              exibir aqui.
-            </p>
-            <p className="text-xs">
-              Defina tipos de orçamento nas categorias para destravar este
-              gráfico.
-            </p>
-          </div>
+          <ChartEmptyState
+            icon={PieIcon}
+            title="Ainda não há gastos com tipos de orçamento configurados para exibir aqui."
+            description="Defina tipos de orçamento nas categorias para destravar este gráfico."
+          />
         </CardContent>
       </Card>
     );

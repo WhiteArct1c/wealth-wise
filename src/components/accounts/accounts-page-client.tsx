@@ -14,7 +14,7 @@ import { AccountForm } from "./account-form";
 import { AccountsTable, type Account } from "./accounts-table";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAccountsContext } from "@/contexts/accounts-context";
+import { useAccountsContext } from "@/contexts";
 
 type AccountsPageClientProps = {
   accounts: Account[];

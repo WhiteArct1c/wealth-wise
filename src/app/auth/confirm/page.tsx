@@ -3,7 +3,7 @@ import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { confirmEmail } from "@/app/actions/auth";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import DarkVeil from "@/components/DarkVeil";
+import DarkVeil from "@/components/shared/dark-veil";
 
 type SearchParams = {
   token_hash?: string;

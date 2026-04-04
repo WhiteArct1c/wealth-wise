@@ -14,7 +14,7 @@ import { TransactionForm } from "./transaction-form";
 import { TransactionsTable, type Transaction } from "./transactions-table";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useTransactionsContext } from "@/contexts/transactions-context";
+import { useTransactionsContext } from "@/contexts";
 
 type TransactionsPageClientProps = {
   transactions: Transaction[];

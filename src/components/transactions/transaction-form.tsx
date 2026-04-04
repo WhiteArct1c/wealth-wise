@@ -29,10 +29,10 @@ import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { transactionSchema, type TransactionFormValues } from "@/lib/validations/transaction";
 import { Loader2, CalendarIcon, ArrowDownCircle, ArrowUpCircle, Repeat } from "lucide-react";
-import { toast } from "sonner";
 import { createTransaction, updateTransaction } from "@/app/actions/transactions";
 import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { useServerAction } from "@/hooks/use-server-action";
+import { cn, formatCurrencyInput } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -44,15 +44,6 @@ type TransactionFormProps = {
   onSuccess?: () => void;
 };
 
-// Função para formatar valor como moeda brasileira (recebe centavos, retorna string formatada)
-const formatCurrency = (value: number): string => {
-  if (!value && value !== 0) return "";
-  return new Intl.NumberFormat("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value / 100);
-};
-
 export function TransactionForm({
   transactionId,
   defaultValues,
@@ -60,7 +51,6 @@ export function TransactionForm({
   categories,
   onSuccess,
 }: TransactionFormProps) {
-  const [isLoading, setIsLoading] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [paymentDateOpen, setPaymentDateOpen] = useState(false);
   const [recurringStartDateOpen, setRecurringStartDateOpen] = useState(false);
@@ -88,36 +78,12 @@ export function TransactionForm({
   const recurringStartDate = useWatch({ control: form.control, name: "recurring_start_date" });
   const frequency = useWatch({ control: form.control, name: "frequency" });
 
-
-  const onSubmit = async (data: TransactionFormValues) => {
-    setIsLoading(true);
-    try {
-      let result;
-
-      if (transactionId) {
-        result = await updateTransaction(transactionId, data);
-      } else {
-        result = await createTransaction(data);
-      }
-
-      if (result?.error) {
-        toast.error(result.error);
-        setIsLoading(false);
-        return;
-      }
-
-      toast.success(
-        transactionId
-          ? "Transação atualizada com sucesso!"
-          : "Transação criada com sucesso!"
-      );
-      form.reset();
-      onSuccess?.();
-    } catch {
-      toast.error("Ocorreu um erro ao salvar a transação");
-      setIsLoading(false);
-    }
-  };
+  const { execute: onSubmit, isLoading } = useServerAction<TransactionFormValues>({
+    action: (data) => transactionId ? updateTransaction(transactionId, data) : createTransaction(data),
+    successMessage: transactionId ? "Transação atualizada com sucesso!" : "Transação criada com sucesso!",
+    errorMessage: "Ocorreu um erro ao salvar a transação",
+    onSuccess: () => { form.reset(); onSuccess?.(); },
+  });
 
   // Filtra categorias baseado no tipo (se necessário)
   const availableCategories = categories;
@@ -249,7 +215,7 @@ export function TransactionForm({
                     inputMode="decimal"
                     placeholder="0,00"
                     className="pl-8"
-                    value={field.value ? formatCurrency(field.value) : ""}
+                    value={field.value ? formatCurrencyInput(field.value) : ""}
                     onChange={(e) => {
                       const inputValue = e.target.value;
                       const numbers = inputValue.replace(/\D/g, "");

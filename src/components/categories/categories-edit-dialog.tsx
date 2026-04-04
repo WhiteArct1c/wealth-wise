@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CategoryForm } from "./category-form";
-import { useCategoriesContext } from "@/contexts/categories-context";
+import { useCategoriesContext } from "@/contexts";
 import { useRouter } from "next/navigation";
 
 export function CategoriesEditDialog() {

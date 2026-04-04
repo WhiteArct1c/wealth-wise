@@ -15,6 +15,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { BarChart3 } from "lucide-react";
+import { ChartEmptyState } from "./chart-empty-state";
 
 type CashFlowData = {
   month: string;
@@ -52,15 +53,11 @@ export function ChartCashFlow({ data }: ChartCashFlowProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex h-[300px] items-center justify-center">
-          <div className="flex flex-col items-center gap-2 text-center text-sm text-muted-foreground">
-            <BarChart3 className="h-8 w-8 text-muted-foreground/70" />
-            <p>
-              Ainda não há dados suficientes para exibir o fluxo de caixa.
-            </p>
-            <p className="text-xs">
-              Registre receitas e despesas para ver este gráfico ganhar vida.
-            </p>
-          </div>
+          <ChartEmptyState
+            icon={BarChart3}
+            title="Ainda não há dados suficientes para exibir o fluxo de caixa."
+            description="Registre receitas e despesas para ver este gráfico ganhar vida."
+          />
         </CardContent>
       </Card>
     );

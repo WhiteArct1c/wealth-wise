@@ -27,10 +27,9 @@ import {
 } from "@/components/ui/popover";
 import { categorySchema, type CategoryFormValues } from "@/lib/validations/category";
 import { Loader2, ArrowDownCircle, ArrowUpCircle, Palette, Check } from "lucide-react";
-import { toast } from "sonner";
 import { createCategory, updateCategory } from "@/app/actions/categories";
-import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useServerAction } from "@/hooks/use-server-action";
 
 type CategoryFormProps = {
   categoryId?: string;
@@ -94,8 +93,6 @@ const colorPalette = [
 ];
 
 export function CategoryForm({ categoryId, defaultValues, onSuccess }: CategoryFormProps) {
-  const [isLoading, setIsLoading] = useState(false);
-
   const form = useForm({
     resolver: zodResolver(categorySchema),
     defaultValues: {
@@ -107,33 +104,12 @@ export function CategoryForm({ categoryId, defaultValues, onSuccess }: CategoryF
     },
   });
 
-  const onSubmit = async (data: CategoryFormValues) => {
-    setIsLoading(true);
-    try {
-      let result;
-      
-      if (categoryId) {
-        result = await updateCategory(categoryId, data);
-      } else {
-        result = await createCategory(data);
-      }
-
-      if (result?.error) {
-        toast.error(result.error);
-        setIsLoading(false);
-        return;
-      }
-
-      toast.success(
-        categoryId ? "Categoria atualizada com sucesso!" : "Categoria criada com sucesso!"
-      );
-      form.reset();
-      onSuccess?.();
-    } catch {
-      toast.error("Ocorreu um erro ao salvar a categoria");
-      setIsLoading(false);
-    }
-  };
+  const { execute: onSubmit, isLoading } = useServerAction<CategoryFormValues>({
+    action: (data) => categoryId ? updateCategory(categoryId, data) : createCategory(data),
+    successMessage: categoryId ? "Categoria atualizada com sucesso!" : "Categoria criada com sucesso!",
+    errorMessage: "Ocorreu um erro ao salvar a categoria",
+    onSuccess: () => { form.reset(); onSuccess?.(); },
+  });
 
   return (
     <Form {...form}>

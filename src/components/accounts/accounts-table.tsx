@@ -34,16 +34,10 @@ import { deleteAccount } from "@/app/actions/accounts";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { TableSortHeader } from "@/components/shared/table-sort-header";
+import { formatCurrency } from "@/lib/utils";
+import type { Account } from "@/lib/types/account";
 
-export type Account = {
-  id: string;
-  name: string;
-  type: "CHECKING" | "CASH" | "INVESTMENT";
-  initial_balance: number;
-  current_balance: number;
-  is_active: boolean | null;
-  created_at: string;
-};
+export type { Account };
 
 type AccountsTableProps = {
   accounts: Account[];
@@ -73,13 +67,6 @@ export function AccountsTable({ accounts, onEdit }: AccountsTableProps) {
   const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
   const router = useRouter();
 
-  const formatCurrency = (value: number) => {
-    // value já vem em reais do banco (não precisa dividir por 100)
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value);
-  };
 
   const handleDeleteClick = (account: Account) => {
     setAccountToDelete(account);

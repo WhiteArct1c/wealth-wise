@@ -55,6 +55,14 @@ export async function createAccount(formData: AccountFormValues) {
 }
 
 export async function updateAccount(id: string, formData: Partial<AccountFormValues>) {
+  const partialValidation = accountSchema.partial().safeParse(formData);
+  if (!partialValidation.success) {
+    return {
+      error: "Dados inválidos",
+      details: partialValidation.error.issues,
+    };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

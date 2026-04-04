@@ -52,6 +52,14 @@ export async function createCategory(formData: CategoryFormValues) {
 }
 
 export async function updateCategory(id: string, formData: Partial<CategoryFormValues>) {
+  const partialValidation = categorySchema.partial().safeParse(formData);
+  if (!partialValidation.success) {
+    return {
+      error: "Dados inválidos",
+      details: partialValidation.error.issues,
+    };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

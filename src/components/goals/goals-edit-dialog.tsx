@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { GoalForm } from "./goal-form";
-import { useGoalsContext } from "@/contexts/goals-context";
+import { useGoalsContext } from "@/contexts";
 import { useRouter } from "next/navigation";
 
 export function GoalsEditDialog() {

@@ -1,0 +1,287 @@
+name: Bundle Analysis
+
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: bundle-analysis-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  analyze-pr-branch:
+    name: Analyze PR Branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Restore node_modules cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            node-modules-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: Build PR branch
+        env:
+          ANALYZE: "true"
+          NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: "placeholder_anon_key_ci"
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: npm run build
+
+      - name: Extract bundle stats
+        run: |
+          python3 - <<'PYEOF'
+          import json, pathlib
+
+          chunks_dir = pathlib.Path(".next/static/chunks")
+          build_manifest = pathlib.Path(".next/build-manifest.json")
+
+          sizes = {}
+          if chunks_dir.exists():
+              for f in chunks_dir.rglob("*.js"):
+                  sizes[str(f.relative_to(".next/static/chunks"))] = f.stat().st_size
+
+          result = {"chunks": sizes}
+
+          if build_manifest.exists():
+              with open(build_manifest) as fh:
+                  manifest = json.load(fh)
+              page_chunks = {}
+              for page, chunk_list in manifest.get("pages", {}).items():
+                  total = sum(
+                      (chunks_dir / c.replace("static/chunks/", "")).stat().st_size
+                      for c in chunk_list
+                      if (chunks_dir / c.replace("static/chunks/", "")).exists()
+                  )
+                  page_chunks[page] = total
+              result["pages"] = page_chunks
+
+          with open("bundle-stats-pr.json", "w") as fh:
+              json.dump(result, fh, indent=2)
+
+          print(f"Captured {len(sizes)} chunks, {len(result.get('pages', {}))} pages")
+          PYEOF
+
+      - name: Upload PR stats
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-stats-pr
+          path: bundle-stats-pr.json
+          retention-days: 7
+
+  analyze-main-branch:
+    name: Analyze Main Branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Restore node_modules cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            node-modules-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: Build main branch
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: "placeholder_anon_key_ci"
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: npm run build
+
+      - name: Extract bundle stats
+        run: |
+          python3 - <<'PYEOF'
+          import json, pathlib
+
+          chunks_dir = pathlib.Path(".next/static/chunks")
+          build_manifest = pathlib.Path(".next/build-manifest.json")
+
+          sizes = {}
+          if chunks_dir.exists():
+              for f in chunks_dir.rglob("*.js"):
+                  sizes[str(f.relative_to(".next/static/chunks"))] = f.stat().st_size
+
+          result = {"chunks": sizes}
+
+          if build_manifest.exists():
+              with open(build_manifest) as fh:
+                  manifest = json.load(fh)
+              page_chunks = {}
+              for page, chunk_list in manifest.get("pages", {}).items():
+                  total = sum(
+                      (chunks_dir / c.replace("static/chunks/", "")).stat().st_size
+                      for c in chunk_list
+                      if (chunks_dir / c.replace("static/chunks/", "")).exists()
+                  )
+                  page_chunks[page] = total
+              result["pages"] = page_chunks
+
+          with open("bundle-stats-main.json", "w") as fh:
+              json.dump(result, fh, indent=2)
+
+          print(f"Captured {len(sizes)} chunks, {len(result.get('pages', {}))} pages")
+          PYEOF
+
+      - name: Upload main stats
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-stats-main
+          path: bundle-stats-main.json
+          retention-days: 7
+
+  compare-and-comment:
+    name: Compare & Post Comment
+    runs-on: ubuntu-latest
+    needs: [analyze-pr-branch, analyze-main-branch]
+    continue-on-error: true
+    steps:
+      - name: Download PR stats
+        uses: actions/download-artifact@v4
+        with:
+          name: bundle-stats-pr
+
+      - name: Download main stats
+        uses: actions/download-artifact@v4
+        with:
+          name: bundle-stats-main
+
+      - name: Generate comparison
+        run: |
+          python3 - <<'PYEOF'
+          import json, os
+
+          def fmt(n):
+              if n < 1024: return f"{n} B"
+              if n < 1024 * 1024: return f"{n / 1024:.1f} KB"
+              return f"{n / 1024 / 1024:.2f} MB"
+
+          def diff_cell(d):
+              if d == 0:     return "➖ no change"
+              if d > 51_200: return f"🔴 +{fmt(d)}"   # >50KB critical increase
+              if d > 10_240: return f"🟠 +{fmt(d)}"   # >10KB moderate increase
+              if d > 1_024:  return f"🟡 +{fmt(d)}"   # >1KB slight increase
+              if d > 0:      return f"🔵 +{fmt(d)}"   # <1KB build noise
+              return                f"🟢 -{fmt(abs(d))}"  # reduction
+
+          def total_badge(d):
+              if d == 0:     return "➖ No change"
+              if d > 51_200: return f"🔴 +{fmt(d)} — significant increase"
+              if d > 10_240: return f"🟠 +{fmt(d)} — moderate increase"
+              if d > 1_024:  return f"🟡 +{fmt(d)} — slight increase"
+              if d > 0:      return f"🔵 +{fmt(d)} — build noise"
+              return                f"🟢 -{fmt(abs(d))} — bundle reduced"
+
+          with open("bundle-stats-pr.json") as f:   pr   = json.load(f)
+          with open("bundle-stats-main.json") as f: main = json.load(f)
+
+          pr_pages   = pr.get("pages", {})
+          main_pages = main.get("pages", {})
+          pr_total   = sum(pr.get("chunks", {}).values())
+          main_total = sum(main.get("chunks", {}).values())
+          total_diff = pr_total - main_total
+
+          lines = [
+              "## 📦 Bundle Size Analysis",
+              "",
+              f"> **Total chunks:** {total_badge(total_diff)} &nbsp;·&nbsp; "
+              f"main `{fmt(main_total)}` → PR `{fmt(pr_total)}`",
+              "",
+              "---",
+              "",
+              "### 🗂️ Pages",
+              "| Route | Main | This PR | Diff |",
+              "|:-----|-----:|-------:|:-----|",
+          ]
+
+          for page in sorted(set(list(pr_pages) + list(main_pages))):
+              ms  = main_pages.get(page, 0)
+              ps  = pr_pages.get(page, 0)
+              d   = ps - ms
+              tag = " `✨ new`"     if page not in main_pages else \
+                    " `🗑️ removed`" if page not in pr_pages   else ""
+              lines.append(f"| `{page}`{tag} | {fmt(ms)} | {fmt(ps)} | {diff_cell(d)} |")
+
+          lines += [
+              "",
+              "---",
+              "",
+              "### 🧩 Shared Chunks",
+              "| | Size |",
+              "|:---|---:|",
+              f"| **main** | {fmt(main_total)} |",
+              f"| **this PR** | {fmt(pr_total)} |",
+              f"| **diff** | {diff_cell(total_diff)} |",
+              "",
+              "---",
+              "",
+              "<details>",
+              "<summary>ℹ️ How to read this</summary>",
+              "",
+              "| Icon | Meaning |",
+              "|:---:|:---|",
+              "| 🔴 | Increase > 50 KB — review carefully |",
+              "| 🟠 | Increase > 10 KB — worth investigating |",
+              "| 🟡 | Increase > 1 KB — slight |",
+              "| 🔵 | Change < 1 KB — build noise |",
+              "| 🟢 | Bundle size reduced |",
+              "| ➖ | No change |",
+              "",
+              "_Sizes are uncompressed. Gzip reduces delivered size by ~70%._",
+              "",
+              "</details>",
+              "",
+              "<!-- bundle-analysis -->",
+          ]
+
+          with open("comment.md", "w") as f:
+              f.write("\n".join(lines))
+
+          print("Comment generated.")
+          PYEOF
+
+      - name: Post comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR=${{ github.event.pull_request.number }}
+          REPO=${{ github.repository }}
+
+          EXISTING=$(gh api repos/$REPO/issues/$PR/comments \
+            --jq '.[] | select(.body | contains("<!-- bundle-analysis -->")) | .id' \
+            | head -1)
+
+          [ -n "$EXISTING" ] && gh api repos/$REPO/issues/comments/$EXISTING -X DELETE
+
+          gh pr comment $PR --repo $REPO --body-file comment.md
