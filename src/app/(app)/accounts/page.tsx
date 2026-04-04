@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wallet } from "lucide-react";
 import { AccountsPageClient } from "@/components/accounts/accounts-page-client";
-import { AccountsProvider } from "@/contexts/accounts-context";
+import { AccountsProvider } from "@/contexts";
 import { AccountsEditDialog } from "@/components/accounts/accounts-edit-dialog";
 import { TablePagination } from "@/components/shared/table-pagination";
 import { TableFilters } from "@/components/shared/table-filters";

@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { TransactionForm } from "./transaction-form";
-import { useTransactionsContext } from "@/contexts/transactions-context";
+import { useTransactionsContext } from "@/contexts";
 import { useRouter } from "next/navigation";
 
 type TransactionsEditDialogProps = {
