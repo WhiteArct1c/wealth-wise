@@ -14,7 +14,7 @@ import { CategoryForm } from "./category-form";
 import { CategoriesTable, type Category } from "./categories-table";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCategoriesContext } from "@/contexts/categories-context";
+import { useCategoriesContext } from "@/contexts";
 
 type CategoriesPageClientProps = {
   categories: Category[];

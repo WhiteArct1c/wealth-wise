@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AccountForm } from "./account-form";
-import { useAccountsContext } from "@/contexts/accounts-context";
+import { useAccountsContext } from "@/contexts";
 import { useRouter } from "next/navigation";
 
 export function AccountsEditDialog() {

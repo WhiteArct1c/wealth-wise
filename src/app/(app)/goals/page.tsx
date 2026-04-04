@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Target, PiggyBank, CheckCircle2, CalendarDays } from "lucide-react";
-import { GoalsProvider } from "@/contexts/goals-context";
+import { GoalsProvider } from "@/contexts";
 import { GoalsPageClient } from "@/components/goals/goals-page-client";
 import { GoalsEditDialog } from "@/components/goals/goals-edit-dialog";
 import { TablePagination } from "@/components/shared/table-pagination";

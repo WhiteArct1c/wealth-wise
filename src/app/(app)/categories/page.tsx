@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tag } from "lucide-react";
 import { CategoriesPageClient } from "@/components/categories/categories-page-client";
-import { CategoriesProvider } from "@/contexts/categories-context";
+import { CategoriesProvider } from "@/contexts";
 import { CategoriesEditDialog } from "@/components/categories/categories-edit-dialog";
 import { TablePagination } from "@/components/shared/table-pagination";
 import { TableFilters } from "@/components/shared/table-filters";

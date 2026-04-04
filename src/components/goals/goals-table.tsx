@@ -42,7 +42,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { parseLocalDate, formatCurrency } from "@/lib/utils";
 import { TableSortHeader } from "@/components/shared/table-sort-header";
-import type { Goal } from "@/contexts/goals-context";
+import type { Goal } from "@/contexts";
 import { GoalContributionForm } from "./goal-contribution-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Tables } from "@/lib/supabase/types";

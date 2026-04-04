@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Receipt, ArrowUpCircle, ArrowDownCircle, Repeat } from "lucide-react";
 import { TransactionsPageClient } from "@/components/transactions/transactions-page-client";
-import { TransactionsProvider } from "@/contexts/transactions-context";
+import { TransactionsProvider } from "@/contexts";
 import { TransactionsEditDialog } from "@/components/transactions/transactions-edit-dialog";
 import { TablePagination } from "@/components/shared/table-pagination";
 import { TableFilters } from "@/components/shared/table-filters";
