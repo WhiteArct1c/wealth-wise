@@ -92,32 +92,32 @@ export default async function TransactionsPage({
   const sortColumn = params.sort || "date";
   const sortOrder = params.order || "desc";
   filteredTransactions.sort((a, b) => {
-    type SortValue = string | number | boolean | null | undefined;
-    let aVal: SortValue = a[sortColumn as keyof typeof a] as SortValue;
-    let bVal: SortValue = b[sortColumn as keyof typeof b] as SortValue;
-    
-    // Tratamento especial para relacionamentos
+    const toComp = (v: unknown): string | number =>
+      typeof v === "string" || typeof v === "number" ? v : "";
+
+    let aComp: string | number;
+    let bComp: string | number;
+
     if (sortColumn === "account") {
-      aVal = Array.isArray(a.account) ? a.account[0]?.name : a.account?.name;
-      bVal = Array.isArray(b.account) ? b.account[0]?.name : b.account?.name;
+      aComp = (Array.isArray(a.account) ? a.account[0]?.name : a.account?.name) ?? "";
+      bComp = (Array.isArray(b.account) ? b.account[0]?.name : b.account?.name) ?? "";
     } else if (sortColumn === "category") {
-      aVal = Array.isArray(a.category) ? a.category[0]?.name : a.category?.name;
-      bVal = Array.isArray(b.category) ? b.category[0]?.name : b.category?.name;
-    }
-    
-    if (aVal === null || aVal === undefined) aVal = "";
-    if (bVal === null || bVal === undefined) bVal = "";
-    
-    if (typeof aVal === "string") {
-      aVal = aVal.toLowerCase();
-      bVal = bVal.toLowerCase();
-    }
-    
-    if (sortOrder === "asc") {
-      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      aComp = (Array.isArray(a.category) ? a.category[0]?.name : a.category?.name) ?? "";
+      bComp = (Array.isArray(b.category) ? b.category[0]?.name : b.category?.name) ?? "";
     } else {
-      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      aComp = toComp(a[sortColumn as keyof typeof a]);
+      bComp = toComp(b[sortColumn as keyof typeof b]);
     }
+
+    if (typeof aComp === "number" && typeof bComp === "number") {
+      return sortOrder === "asc" ? aComp - bComp : bComp - aComp;
+    }
+
+    const aStr = String(aComp).toLowerCase();
+    const bStr = String(bComp).toLowerCase();
+    return sortOrder === "asc"
+      ? aStr > bStr ? 1 : aStr < bStr ? -1 : 0
+      : aStr < bStr ? 1 : aStr > bStr ? -1 : 0;
   });
 
   // Aplicar paginação
@@ -193,52 +193,46 @@ export default async function TransactionsPage({
   const recurringSort = params.recurringSort || "next_run_date";
   const recurringOrder = params.recurringOrder || "asc";
   filteredRecurring.sort((a, b) => {
-    type SortValue = string | number | boolean | null | undefined;
-    let aVal: SortValue = a[recurringSort as keyof typeof a] as SortValue;
-    let bVal: SortValue = b[recurringSort as keyof typeof b] as SortValue;
-    
-    // Tratamento especial para relacionamentos
-    if (recurringSort === "account") {
-      aVal = a.account?.name || "";
-      bVal = b.account?.name || "";
-    } else if (recurringSort === "category") {
-      aVal = a.category?.name || "";
-      bVal = b.category?.name || "";
-    }
-    
-    // Tratamento especial para valores numéricos (amount)
+    const toComp = (v: unknown): string | number =>
+      typeof v === "string" || typeof v === "number" ? v : "";
+
     if (recurringSort === "amount") {
-      aVal = a.amount || 0;
-      bVal = b.amount || 0;
-      return recurringOrder === "asc" ? aVal - bVal : bVal - aVal;
+      const aAmt = a.amount || 0;
+      const bAmt = b.amount || 0;
+      return recurringOrder === "asc" ? aAmt - bAmt : bAmt - aAmt;
     }
-    
-    // Tratamento especial para datas (next_run_date, start_date, end_date)
+
     if (recurringSort === "next_run_date" || recurringSort === "start_date" || recurringSort === "end_date") {
-      aVal = aVal ? new Date(aVal).getTime() : 0;
-      bVal = bVal ? new Date(bVal).getTime() : 0;
-      return recurringOrder === "asc" ? aVal - bVal : bVal - aVal;
+      const rawA = a[recurringSort as keyof typeof a];
+      const rawB = b[recurringSort as keyof typeof b];
+      const aTime = typeof rawA === "string" ? new Date(rawA).getTime() : 0;
+      const bTime = typeof rawB === "string" ? new Date(rawB).getTime() : 0;
+      return recurringOrder === "asc" ? aTime - bTime : bTime - aTime;
     }
-    
-    if (aVal === null || aVal === undefined) aVal = "";
-    if (bVal === null || bVal === undefined) bVal = "";
-    
-    // Tratamento para valores numéricos
-    if (typeof aVal === "number" && typeof bVal === "number") {
-      return recurringOrder === "asc" ? aVal - bVal : bVal - aVal;
-    }
-    
-    // Tratamento para strings
-    if (typeof aVal === "string") {
-      aVal = aVal.toLowerCase();
-      bVal = bVal.toLowerCase();
-    }
-    
-    if (recurringOrder === "asc") {
-      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+
+    let aComp: string | number;
+    let bComp: string | number;
+
+    if (recurringSort === "account") {
+      aComp = a.account?.name || "";
+      bComp = b.account?.name || "";
+    } else if (recurringSort === "category") {
+      aComp = a.category?.name || "";
+      bComp = b.category?.name || "";
     } else {
-      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      aComp = toComp(a[recurringSort as keyof typeof a]);
+      bComp = toComp(b[recurringSort as keyof typeof b]);
     }
+
+    if (typeof aComp === "number" && typeof bComp === "number") {
+      return recurringOrder === "asc" ? aComp - bComp : bComp - aComp;
+    }
+
+    const aStr = String(aComp).toLowerCase();
+    const bStr = String(bComp).toLowerCase();
+    return recurringOrder === "asc"
+      ? aStr > bStr ? 1 : aStr < bStr ? -1 : 0
+      : aStr < bStr ? 1 : aStr > bStr ? -1 : 0;
   });
 
   // Aplicar paginação
