@@ -106,35 +106,29 @@ export default async function AccountsPage({
   const sortColumn = params.sort || "created_at";
   const sortOrder = params.order || "desc";
   accountsWithBalance.sort((a, b) => {
-    type SortValue = string | number | boolean | null | undefined;
-    let aVal: SortValue = a[sortColumn as keyof typeof a] as SortValue;
-    let bVal: SortValue = b[sortColumn as keyof typeof b] as SortValue;
-    
-    // Tratamento especial para current_balance
+    const rawA = a[sortColumn as keyof typeof a];
+    const rawB = b[sortColumn as keyof typeof b];
+
+    let aComp: string | number;
+    let bComp: string | number;
+
     if (sortColumn === "initial_balance" || sortColumn === "current_balance") {
-      aVal = sortColumn === "current_balance" ? a.current_balance : (a.initial_balance || 0);
-      bVal = sortColumn === "current_balance" ? b.current_balance : (b.initial_balance || 0);
-    }
-    
-    if (aVal === null || aVal === undefined) aVal = sortColumn.includes("balance") ? 0 : "";
-    if (bVal === null || bVal === undefined) bVal = sortColumn.includes("balance") ? 0 : "";
-    
-    // Tratamento para valores numéricos
-    if (typeof aVal === "number" && typeof bVal === "number") {
-      return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
-    }
-    
-    // Tratamento para strings
-    if (typeof aVal === "string") {
-      aVal = aVal.toLowerCase();
-      bVal = bVal.toLowerCase();
-    }
-    
-    if (sortOrder === "asc") {
-      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      aComp = sortColumn === "current_balance" ? a.current_balance : (a.initial_balance || 0);
+      bComp = sortColumn === "current_balance" ? b.current_balance : (b.initial_balance || 0);
     } else {
-      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      aComp = (typeof rawA === "string" || typeof rawA === "number") ? rawA : (sortColumn.includes("balance") ? 0 : "");
+      bComp = (typeof rawB === "string" || typeof rawB === "number") ? rawB : (sortColumn.includes("balance") ? 0 : "");
     }
+
+    if (typeof aComp === "number" && typeof bComp === "number") {
+      return sortOrder === "asc" ? aComp - bComp : bComp - aComp;
+    }
+
+    const aStr = String(aComp).toLowerCase();
+    const bStr = String(bComp).toLowerCase();
+    return sortOrder === "asc"
+      ? aStr > bStr ? 1 : aStr < bStr ? -1 : 0
+      : aStr < bStr ? 1 : aStr > bStr ? -1 : 0;
   });
 
   // Contar total após filtros (mas antes da paginação)
