@@ -26,17 +26,7 @@ import { Loader2, Wallet, Building2, PiggyBank } from "lucide-react";
 import { toast } from "sonner";
 import { createAccount, updateAccount } from "@/app/actions/accounts";
 import { useState } from "react";
-
-// Função para formatar valor como moeda brasileira
-// Recebe centavos (do formulário) e retorna string formatada
-const formatCurrency = (value: number): string => {
-  if (!value && value !== 0) return "";
-  // Converte centavos para reais para exibição
-  return new Intl.NumberFormat("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value / 100);
-};
+import { formatCurrencyInput } from "@/lib/utils";
 
 type AccountFormProps = {
   accountId?: string;
@@ -203,7 +193,7 @@ export function AccountForm({ accountId, defaultValues, onSuccess }: AccountForm
                     inputMode="decimal"
                     placeholder="0,00"
                     className="pl-8"
-                    value={field.value ? formatCurrency(field.value) : ""}
+                    value={field.value ? formatCurrencyInput(field.value) : ""}
                     onChange={(e) => {
                       const inputValue = e.target.value;
                       

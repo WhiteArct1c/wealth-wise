@@ -36,7 +36,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { cn, parseLocalDate } from "@/lib/utils";
+import { cn, parseLocalDate, formatCurrency } from "@/lib/utils";
 import { TableSortHeader } from "@/components/shared/table-sort-header";
 
 export type RecurringTransaction = {
@@ -83,13 +83,6 @@ export function RecurringTransactionsTable({
   const [recurringToDelete, setRecurringToDelete] = useState<RecurringTransaction | null>(null);
   const [newStatus, setNewStatus] = useState<"ACTIVE" | "PAUSED" | "CANCELLED" | null>(null);
   const router = useRouter();
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value);
-  };
 
   const formatDate = (dateString: string) => {
     return format(parseLocalDate(dateString), "dd/MM/yyyy", { locale: ptBR });

@@ -31,7 +31,7 @@ import { Loader2, CalendarIcon } from "lucide-react";
 import { toast } from "sonner";
 import { createRecurringTransaction, updateRecurringTransaction, type RecurringFormValues } from "@/app/actions/recurring-transactions";
 import { useState } from "react";
-import { cn, parseLocalDate } from "@/lib/utils";
+import { cn, parseLocalDate, formatCurrencyInput } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -58,15 +58,6 @@ type RecurringTransactionFormProps = {
   accounts: Array<{ id: string; name: string }>;
   categories: Array<{ id: string; name: string; type: "INCOME" | "EXPENSE"; color_hex: string | null }>;
   onSuccess?: () => void;
-};
-
-// Função para formatar valor como moeda brasileira (recebe centavos, retorna string formatada)
-const formatCurrency = (value: number): string => {
-  if (!value && value !== 0) return "";
-  return new Intl.NumberFormat("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value / 100);
 };
 
 export function RecurringTransactionForm({
@@ -233,7 +224,7 @@ export function RecurringTransactionForm({
                     inputMode="decimal"
                     placeholder="0,00"
                     className="pl-8"
-                    value={field.value ? formatCurrency(field.value) : ""}
+                    value={field.value ? formatCurrencyInput(field.value) : ""}
                     onChange={(e) => {
                       const inputValue = e.target.value;
                       const numbers = inputValue.replace(/\D/g, "");

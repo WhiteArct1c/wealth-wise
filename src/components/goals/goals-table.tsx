@@ -40,7 +40,7 @@ import { useState } from "react";
 import { deleteGoal } from "@/app/actions/goals";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { parseLocalDate } from "@/lib/utils";
+import { parseLocalDate, formatCurrency } from "@/lib/utils";
 import { TableSortHeader } from "@/components/shared/table-sort-header";
 import type { Goal } from "@/contexts/goals-context";
 import { GoalContributionForm } from "./goal-contribution-form";
@@ -98,16 +98,6 @@ export function GoalsTable({ goals, onEdit }: GoalsTableProps) {
 
     setDeleteDialogOpen(false);
     setGoalToDelete(null);
-  };
-
-  const formatCurrency = (value: number | null) => {
-    const safe = value ?? 0;
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(safe);
   };
 
   const formatDate = (date: string | null) => {

@@ -35,7 +35,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { cn, parseLocalDate } from "@/lib/utils";
+import { cn, parseLocalDate, formatCurrency } from "@/lib/utils";
 import { TRANSACTION_STATUS_LABEL } from "@/constants/status";
 import { TableSortHeader } from "@/components/shared/table-sort-header";
 
@@ -64,14 +64,6 @@ export function TransactionsTable({ transactions, onEdit }: TransactionsTablePro
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const router = useRouter();
-
-  const formatCurrency = (value: number) => {
-    // value já vem em reais do banco
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value);
-  };
 
   const formatDate = (dateString: string) => {
     return format(parseLocalDate(dateString), "dd/MM/yyyy", { locale: ptBR });

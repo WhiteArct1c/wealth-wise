@@ -20,7 +20,7 @@ import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { TRANSACTION_STATUS_LABEL } from "@/constants/status";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { parseLocalDate } from "@/lib/utils";
+import { parseLocalDate, formatCurrency } from "@/lib/utils";
 
 type Transaction = {
   id: string;
@@ -38,13 +38,6 @@ type RecentTransactionsProps = {
 };
 
 export function RecentTransactions({ transactions }: RecentTransactionsProps) {
-  const formatCurrency = (value: number) => {
-    // O valor no Supabase está em centavos (integer), então dividimos por 100
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(Math.abs(value) / 100);
-  };
 
   const formatDate = (dateString: string) => {
     return format(parseLocalDate(dateString), "dd/MM/yyyy", { locale: ptBR });
@@ -116,7 +109,7 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
                   }`}
                 >
                   {transaction.type === "INCOME" ? "+" : "-"}
-                  {formatCurrency(transaction.amount)}
+                  {formatCurrency(Math.abs(transaction.amount) / 100)}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {formatDate(transaction.date)}

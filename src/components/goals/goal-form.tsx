@@ -26,19 +26,12 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { createGoal, updateGoal } from "@/app/actions/goals";
+import { formatCurrencyInput } from "@/lib/utils";
 
 type GoalFormProps = {
   goalId?: string;
   defaultValues?: Partial<GoalFormValues>;
   onSuccess?: () => void;
-};
-
-const formatCurrency = (value: number): string => {
-  if (!value && value !== 0) return "";
-  return new Intl.NumberFormat("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value / 100);
 };
 
 export function GoalForm({ goalId, defaultValues, onSuccess }: GoalFormProps) {
@@ -124,7 +117,7 @@ export function GoalForm({ goalId, defaultValues, onSuccess }: GoalFormProps) {
                       inputMode="decimal"
                       placeholder="0,00"
                       className="pl-8"
-                      value={field.value ? formatCurrency(field.value) : ""}
+                      value={field.value ? formatCurrencyInput(field.value) : ""}
                       onChange={(e) => {
                         const inputValue = e.target.value;
                         const numbers = inputValue.replace(/\D/g, "");
@@ -175,7 +168,7 @@ export function GoalForm({ goalId, defaultValues, onSuccess }: GoalFormProps) {
                       inputMode="decimal"
                       placeholder="0,00"
                       className="pl-8"
-                      value={field.value ? formatCurrency(field.value) : ""}
+                      value={field.value ? formatCurrencyInput(field.value) : ""}
                       onChange={(e) => {
                         const inputValue = e.target.value;
                         const numbers = inputValue.replace(/\D/g, "");
