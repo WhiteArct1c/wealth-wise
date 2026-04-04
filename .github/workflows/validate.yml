@@ -102,8 +102,8 @@ jobs:
         run: npm ci --prefer-offline
 
       - name: Build
-        # NEXT_PUBLIC_ vars são inlined em build time. Passar strings não-vazias
-        # satisfaz o construtor URL() do @supabase/ssr sem fazer requests reais.
+        # NEXT_PUBLIC_ vars are inlined at build time. Non-empty placeholder strings
+        # satisfy the URL() constructor inside @supabase/ssr without making real requests.
         env:
           NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: "placeholder_anon_key_ci"

@@ -36,7 +36,7 @@ jobs:
           # Conventional Commits → Semver:
           #   BREAKING CHANGE / type!:  →  MAJOR
           #   feat:                     →  MINOR
-          #   fix: / chore: / demais    →  PATCH
+          #   fix: / chore: / others    →  PATCH
           # -----------------------------------------------------------------------
 
           git fetch --tags --force
@@ -51,7 +51,7 @@ jobs:
             LAST_TAG_SHA=$(git rev-list -n 1 "$LAST_TAG")
           fi
 
-          echo "Última tag: $LAST_TAG"
+          echo "Last tag: $LAST_TAG"
 
           if [ -z "$LAST_TAG_SHA" ]; then
             COMMITS=$(git log --format="%s%n%b" HEAD)
@@ -60,7 +60,7 @@ jobs:
           fi
 
           if [ -z "$COMMITS" ]; then
-            echo "Nenhum commit desde a última tag — pulando release"
+            echo "No commits since last tag — skipping release"
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -87,7 +87,7 @@ jobs:
 
           NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
           NEW_TAG="v${NEW_VERSION}"
-          echo "Nova versão: $NEW_TAG"
+          echo "New version: $NEW_TAG"
 
           build_section() {
             local label="$1" pattern="$2"
@@ -109,10 +109,10 @@ jobs:
           BREAKING=$(build_section "Breaking Changes" "[a-z]+(\(.+\))?!:")
           FEATURES=$(build_section "Features" "feat(\(.+\))?:")
           FIXES=$(build_section "Bug Fixes" "fix(\(.+\))?:")
-          MAINT=$(build_section "Manutenção" "chore(\(.+\))?:|refactor(\(.+\))?:|perf(\(.+\))?:")
+          MAINT=$(build_section "Maintenance" "chore(\(.+\))?:|refactor(\(.+\))?:|perf(\(.+\))?:")
 
           CHANGELOG="${BREAKING}${FEATURES}${FIXES}${MAINT}"
-          [ -z "$CHANGELOG" ] && CHANGELOG="Sem mudanças significativas."
+          [ -z "$CHANGELOG" ] && CHANGELOG="No significant changes."
 
           echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
@@ -157,7 +157,7 @@ jobs:
             type=raw,value=${{ needs.compute-version.outputs.version }}
             type=raw,value=latest
 
-      - name: Build e push multi-arch
+      - name: Build and push multi-arch
         id: build
         uses: docker/build-push-action@v6
         with:
@@ -184,7 +184,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Criar e push git tag
+      - name: Create and push git tag
         env:
           TAG: ${{ needs.compute-version.outputs.tag }}
         run: |
@@ -193,7 +193,7 @@ jobs:
           git tag -a "$TAG" -m "Release $TAG"
           git push origin "$TAG"
 
-      - name: Criar GitHub Release
+      - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ needs.compute-version.outputs.tag }}
@@ -201,18 +201,18 @@ jobs:
           CHANGELOG: ${{ needs.compute-version.outputs.changelog }}
           IMAGE_DIGEST: ${{ needs.build-and-push.outputs.image-digest }}
         run: |
-          BODY="## O que mudou
+          BODY="## What's Changed
 
           ${CHANGELOG}
 
-          ## Imagem Docker
+          ## Docker Image
 
           \`\`\`
           docker pull ghcr.io/whitearct1c/wealth-wise:${VERSION}
           \`\`\`
 
           **Digest**: \`${IMAGE_DIGEST}\`
-          **Plataformas**: linux/amd64, linux/arm64"
+          **Platforms**: linux/amd64, linux/arm64"
 
           gh release create "$TAG" \
             --title "Release ${TAG}" \

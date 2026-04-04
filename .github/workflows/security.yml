@@ -2,7 +2,7 @@ name: Security Scanning
 
 on:
   schedule:
-    - cron: "0 8 * * 1" # Segunda-feira 08:00 UTC
+    - cron: "0 8 * * 1" # Monday 08:00 UTC
   pull_request:
     branches:
       - main
@@ -30,8 +30,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Audit (HIGH/CRITICAL, apenas prod deps)
-        # --omit=dev: exclui devDeps — sem exposição em runtime, reduz falsos positivos
+      - name: Audit (HIGH/CRITICAL, prod deps only)
+        # --omit=dev: excludes devDeps — no runtime exposure, reduces false positives
         run: npm audit --audit-level=high --omit=dev
 
   codeql:
@@ -73,7 +73,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login no GHCR (scan agendado)
+      - name: Login to GHCR (scheduled scan)
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         uses: docker/login-action@v3
         with:
@@ -81,7 +81,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build local para scan (PR)
+      - name: Build local image for scan (PR)
         if: github.event_name == 'pull_request'
         uses: docker/build-push-action@v6
         with:
@@ -97,7 +97,7 @@ jobs:
             NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co
             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=placeholder_anon_key_ci
 
-      - name: Definir alvo do scan
+      - name: Set scan target
         id: target
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -116,16 +116,16 @@ jobs:
           exit-code: "1"
           ignore-unfixed: true
 
-      - name: Upload SARIF para Security tab
+      - name: Upload SARIF to Security tab
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif
           category: trivy-container
 
-      - name: Falha explícita em CRITICAL
+      - name: Fail on CRITICAL vulnerabilities
         if: failure()
         run: |
-          echo "::error::Trivy encontrou vulnerabilidades CRITICAL na imagem."
-          echo "::error::Verifique a aba Security do repositório para detalhes."
+          echo "::error::Trivy found CRITICAL vulnerabilities in the container image."
+          echo "::error::Check the Security tab in the repository for details."
           exit 1
